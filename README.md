@@ -20,7 +20,7 @@ Then prompts to:
 - firewalld or UFW
 
 ## Installation
-`wget -O hard_pihole` [copy and paste this link](https://gist.github.com/ryoskzypu/f3cff6877c5fbdab00f1e12b3522ac22/raw/a3e6a07793d7d9ca79af2776a32b3419d475820b/hard_pihole)
+`wget -O hard_pihole` [copy and paste this link](https://github.com/ryoskzypu/hard_pihole/raw/main/hard_pihole)
 
 ## Usage
     chmod u+x hard_pihole
