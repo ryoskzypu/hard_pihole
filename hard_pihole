@@ -1,0 +1,477 @@
+#!/bin/bash
+#
+# hard_pihole
+#
+# Script checks status of network, Pi-hole, firewall and web server; then
+# prompts to apply the firewall rules recommended by Pi-hole docs and harden
+# it further.
+#
+# https://docs.pi-hole.net/main/prerequisites/#firewalls
+# https://reddit.com/r/pihole/comments/x7wns0/pihole_hardening_tips_4fun
+
+shopt -s extglob
+unset -v input array
+
+prog=${0##*/}
+usage="usage: $prog [-h]"
+
+show_help() {
+cat << END
+$usage
+
+dependencies:
+  required:
+    sudo
+    pi-hole
+    firewalld or UFW
+
+  optional:
+    lighttpd or any web server
+    systemctl
+    ip
+    ss
+    dig
+    awk
+    grep
+    find
+
+valid inputs:
+  allowed IPs must be IPv4 and separated
+  by spaces, e.g., 192.168.0.0/24 192.168.0.137
+END
+}
+
+die() {
+  printf '%s\n%s\n' "$1" "$usage" >&2
+  exit 1
+}
+
+see() {
+  "$@" 2> /dev/null
+}
+
+is_installed() {
+  command -v "$1" > /dev/null 2>&1
+}
+
+is_connected() {
+  ip route get 1.1.1.1 > /dev/null 2>&1
+}
+
+print_fmt() {
+  printf '  %s\n' "$1"
+}
+
+errfmt() {
+  printf '%s not installed. status output will break.\n' "$1" >&2
+}
+
+sum_prompt() {
+  local input
+
+  IFS= read -rp "Check pi-hole and $app status/rules? [Y/n]: " input
+
+  case ${input,,} in
+    y|yes) see check_status summary ;;
+    n|no) return 0 ;;
+    *) die 'ERROR: invalid input'
+  esac
+}
+
+fwd_rules() {
+  local ip service
+
+  service=$1
+
+  sudo firewall-cmd --permanent --remove-service="$service"
+
+  for ip in "${array[@]}"; do
+    sudo firewall-cmd --permanent --add-rich-rule="rule family=ipv4 \
+      source address=$ip service name=$service accept"
+  done
+
+  sudo firewall-cmd --reload
+}
+
+ufw_rules() {
+  local ip port
+
+  port=$1
+
+  case $port in
+    53) sudo ufw delete allow 53/tcp && sudo ufw delete allow 53/udp ;;
+    80) sudo ufw delete allow 80/tcp
+  esac
+
+  for ip in "${array[@]}"; do
+    case $port in
+      53)
+        sudo ufw allow proto tcp from "$ip" to any port 53
+        sudo ufw allow proto udp from "$ip" to any port 53
+        ;;
+      80)
+        sudo ufw allow proto tcp from "$ip" to any port 80
+    esac
+  done
+
+  sudo ufw reload
+}
+
+get_rules() {
+  case $1 in
+    pihole)
+      case $firewall in
+        fwd) fwd_rules dns ;;
+        ufw) ufw_rules 53
+      esac
+      ;;
+    web)
+      case $firewall in
+        fwd) fwd_rules http ;;
+        ufw) ufw_rules 80
+      esac
+  esac
+}
+
+validate_ip() {
+  local range cidr ip_regex ip err
+
+  range='[1-9]?[0-9]|1[0-9][0-9]|25[0-5]|2[0-4][0-9]'
+  cidr='[0-9]|1[0-9]|2[0-9]|3[0-2]'
+  ip_regex="^(($range)\.){3}($range)(\/?(($cidr)?))$"
+
+  err="see help for a valid input ($prog -h)"
+
+  for ip in "${array[@]}"; do
+    if ! [[ $ip =~ $ip_regex ]]; then
+      printf "ERROR: invalid IP: '%s'\n%s\n" "$ip" "$err" >&2
+      exit 1
+    fi
+  done
+}
+
+get_ips() {
+  local input
+
+  IFS= read -rp "Enter the IPs allowed to access $target: " input
+
+  if [[ $input = @(| ) ]]; then
+    die 'ERROR: invalid input'
+  fi
+
+  read -ra array <<< "$input"
+}
+
+hard_prompt() {
+  local target input
+
+  case $1 in
+    pihole) target='pi-hole' ;;
+    web) target='web interface'
+  esac
+
+  IFS= read -rp "Restrict $target [Y/n]: " input
+
+  case ${input,,} in
+    y|yes) get_ips "$1"; validate_ip; get_rules "$1" > /dev/null 2>&1; echo 'OK' ;;
+    n|no) return 0 ;;
+    *) die 'ERROR: invalid input'
+  esac
+}
+
+apply_rules() {
+  case $firewall in
+    fwd)
+      sudo sh -c 'rm -rf /etc/firewalld/zones/*'
+      sudo firewall-cmd --complete-reload
+      sudo firewall-cmd --permanent --add-service=http --add-service=dns \
+        --add-service=dhcp
+      sudo firewall-cmd --permanent --new-zone=ftl
+      sudo firewall-cmd --permanent --zone=ftl --add-interface=lo
+      sudo firewall-cmd --permanent --zone=ftl --add-port=4711/tcp
+      sudo firewall-cmd --reload
+      ;;
+    ufw)
+      sudo ufw --force reset
+      sudo ufw enable
+      sudo ufw allow 80/tcp
+      sudo ufw allow 53/tcp
+      sudo ufw allow 53/udp
+      sudo ufw allow 67/tcp
+      sudo ufw allow 67/udp
+      sudo ufw reload
+  esac
+}
+
+rules_prompt() {
+  local input
+
+  IFS= read -rp "Reset $app and apply recommended rules? [Y/n]: " input
+
+  case ${input,,} in
+    y|yes) apply_rules > /dev/null 2>&1; echo 'OK' ;;
+    n|no) return 0 ;;
+    *) die 'ERROR: invalid input'
+  esac
+}
+
+websv_status() {
+  websv=$(sudo ss -ntlp4 | awk '$4 ~/:80$/ {split($6, str, /"/); \
+    print str[2]}')
+
+  if [[ -n $websv ]]; then
+    print_fmt "$websv server: OK"
+
+    service_status "$websv"
+  else
+    print_fmt 'web server: not detected'
+    echo
+  fi
+}
+
+service_status() {
+  local status activity
+
+  status=$(systemctl is-enabled "$1")
+  activity=$(systemctl is-active "$1")
+
+  print_fmt "service: $status and $activity"
+  echo
+}
+
+firewall_status() {
+  local status
+
+  case $1 in
+    fwd) status=$(sudo firewall-cmd --state) ;;
+    ufw) status=$(sudo ufw status verbose | awk '/Status/ {print $2}')
+  esac
+
+  print_fmt "$app install: OK"
+  print_fmt "status: $status"
+
+  service_status "${app,,}"
+}
+
+pihole_status() {
+  local status blocking
+
+  status=$(sudo pihole status | grep -E 'DNS|FTL')
+  blocking=$(sudo pihole status | awk '/Pi/ {print $5}')
+
+  print_fmt 'pi-hole install: OK'
+  print_fmt "status: ${status#*] }"
+  print_fmt "blocking: $blocking"
+
+  service_status pihole-FTL
+}
+
+get_dns() {
+  if systemctl -q is-enabled systemd-resolved; then
+    dns=$(awk '/nameserver/ {print $2; exit}' /run/systemd/resolve/resolv.conf)
+  else
+    dns=$(dig +noall +stats 1.1.1.1 | awk -F'[()]' '/SERVER/ {print $2}')
+  fi
+}
+
+get_method() {
+  if ip -o -4 addr show "$device" | grep -q dynamic; then
+    method='DHCP'
+  else
+    method='static'
+  fi
+}
+
+get_type() {
+  linktype=$(ip -details link show "$device" \
+    | awk '!/altname/ && NR==3 {print $1}')
+
+  if [[ -z $linktype ]]; then
+    grep -q "$device" /proc/net/wireless && linktype='wireless'
+  fi
+
+  while IFS= read -r line; do
+    if [[ $line = "$device" ]]; then
+      devtype='physical'
+    fi
+  done < <(find /sys/class/net -mindepth 1 -maxdepth 1 -lname '*virtual*' \
+    -prune -o -printf '%f\n')
+}
+
+get_info() {
+  read -r _ _ gateway _ device _ lanip _ < <(ip -o -4 route get 1.1.1.1)
+
+  mac=$(< /sys/class/net/"$device"/address)
+  route=$(ip -o -4 route show dev "$device" proto kernel scope link \
+    | awk '{print $1}')
+  wanip=$(dig +short TXT whoami.ds.akahelp.net | awk -F'"' '{print $4}')
+
+}
+
+network_status() {
+  local device linktype devtype mac route gateway method lanip wanip dns
+
+  if is_connected; then
+    get_info
+    get_type
+    get_method
+    get_dns
+
+    print_fmt 'status: connected'
+    print_fmt "interface: $device"
+    print_fmt "type: ${linktype:-ethernet} [${devtype:-virtual}]"
+    print_fmt "MAC: $mac"
+    print_fmt "route: $route"
+    print_fmt "gateway: $gateway"
+    print_fmt "private IP: $lanip [$method]"
+    print_fmt "public IP: $wanip"
+    print_fmt "primary DNS: $dns"
+  else
+    print_fmt 'status: disconnected'
+  fi
+}
+
+check_status() {
+  case $1 in
+    firewalls)
+      case $firewall in
+        fwd) firewall_status fwd ;;
+        ufw) firewall_status ufw
+      esac
+      ;;
+    summary)
+      sudo pihole status
+      echo
+
+      case $firewall in
+        fwd) sudo firewall-cmd --zone=public --list-all ;;
+        ufw) sudo ufw status verbose
+      esac
+  esac
+}
+
+opts_prompt() {
+  local input
+
+  IFS= read -rp 'Continue? [Y/n]: ' input
+
+  case ${input,,} in
+    y|yes) ;;
+    n|no) exit 0 ;;
+    *) die 'ERROR: invalid input'
+  esac
+}
+
+opts_fmt() {
+  local tmp item
+
+  case ${#opts[@]} in
+    1)
+      errfmt "${opts[*]} is"
+      ;;
+    2)
+      tmp=${opts[*]/%/ and}
+
+      errfmt "${tmp% and} are"
+      ;;
+    *)
+      item=${opts[-2]}
+      tmp=${opts[*]/%/,}
+      tmp=${tmp/${item},/${item} and}
+
+      errfmt "${tmp%,} are"
+  esac
+}
+
+check_firewalls() {
+  local fw
+
+  for fw in "${firewalls[@]}"; do
+    if is_installed "$fw"; then
+      case $fw in
+        firewall-cmd)
+          firewall='fwd'
+          app='firewalld'
+          ;;
+        ufw)
+          firewall='ufw'
+          app='UFW'
+          ;;
+        *)
+          die 'ERROR: firewalld and UFW are not installed'
+      esac
+    fi
+  done
+}
+
+check_depends() {
+  local dep err
+
+  err="see help for dependencies ($prog -h)"
+
+  for dep in "${depends[@]}"; do
+    if ! is_installed "$dep"; then
+      case $dep in
+        sudo|pihole)
+          printf 'ERROR: %s is not installed\n%s\n' "$dep" "$err" >&2
+          exit 1
+          ;;
+        *)
+          opts+=("$dep")
+      esac
+    fi
+  done
+}
+
+check_install() {
+  local depends firewalls opts
+
+  depends=(sudo pihole systemctl ip ss dig awk grep find)
+  firewalls=(firewall-cmd ufw)
+  opts=()
+
+  check_depends
+  check_firewalls
+
+  if [[ -n ${opts[*]} ]]; then
+    opts_fmt
+    opts_prompt
+  fi
+}
+
+main() {
+  case $1 in
+    -h)
+      show_help
+      exit 0
+      ;;
+    *)
+      check_install
+      clear
+
+      echo 'Checking network status...'
+      see network_status
+      echo
+
+      echo 'Checking Pi-hole status...'
+      see pihole_status
+
+      echo 'Checking firewall status...'
+      see check_status firewalls
+
+      echo 'Checking web server status...'
+      see websv_status
+
+      rules_prompt
+      hard_prompt pihole
+
+      if [[ -n $websv ]]; then
+        hard_prompt web
+      fi
+
+      sum_prompt
+      echo 'Done.'
+  esac
+}
+
+main "$@"
