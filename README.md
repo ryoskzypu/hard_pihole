@@ -15,13 +15,12 @@ Then prompts to:
 - Restrict Pi-hole or web interface
 
 ## Dependencies
-- sudo
 - [Pi-hole](https://github.com/pi-hole/pi-hole)
 - firewalld or UFW
 
 ## Installation
 `wget -O hard_pihole` [copy and paste this link](https://github.com/ryoskzypu/hard_pihole/raw/main/hard_pihole)
 
-## Usage
     chmod u+x hard_pihole
+## Usage
     sudo ./hard_pihole
