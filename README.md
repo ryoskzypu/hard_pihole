@@ -1,6 +1,6 @@
 # hard pihole
 
-#### This script is based on [this](https://www.reddit.com/r/pihole/comments/x7wns0/pihole_hardening_tips_4fun/) post from [/r/pihole](https://www.reddit.com/r/pihole/) sub.
+#### This script is based on [this] post from [/r/pihole] sub.
 
 It checks status of:
 
@@ -15,12 +15,18 @@ Then prompts to:
 - Restrict Pi-hole or web interface
 
 ## Dependencies
-- [Pi-hole](https://github.com/pi-hole/pi-hole)
+- [Pi-hole]
 - firewalld or UFW
 
 ## Installation
-`wget -O hard_pihole` [copy and paste this link](https://github.com/ryoskzypu/hard_pihole/raw/main/hard_pihole)
+`wget -O hard_pihole` [`copy and paste this link`]
 
-    chmod u+x hard_pihole
+`chmod u+x hard_pihole`
+
 ## Usage
-    sudo ./hard_pihole
+`sudo ./hard_pihole`
+
+[this]: <https://www.reddit.com/r/pihole/comments/x7wns0/pihole_hardening_tips_4fun/>
+[/r/pihole]: <https://www.reddit.com/r/pihole/>
+[Pi-hole]: <https://github.com/pi-hole/pi-hole>
+[`copy and paste this link`]: <https://github.com/ryoskzypu/hard_pihole/raw/main/hard_pihole>
