@@ -1,6 +1,6 @@
 # hard pihole
 
-#### This script is based on [this](https://www.reddit.com/r/pihole/comments/x7wns0/pihole_hardening_tips_4fun/) post on [/r/pihole](https://www.reddit.com/r/pihole/) sub.
+#### This script is based on [this](https://www.reddit.com/r/pihole/comments/x7wns0/pihole_hardening_tips_4fun/) post from [/r/pihole](https://www.reddit.com/r/pihole/) sub.
 
 It checks status of:
 
