@@ -182,7 +182,7 @@ hard_prompt() {
 apply_rules() {
   case $firewall in
     fwd)
-      sudo sh -c 'rm -rf /etc/firewalld/zones/*'
+      sudo bash -c 'rm -rf /etc/firewalld/zones/*'
       sudo firewall-cmd --complete-reload
       sudo firewall-cmd --permanent --add-service=http --add-service=dns \
         --add-service=dhcp
@@ -294,8 +294,8 @@ get_type() {
     if [[ $line = "$device" ]]; then
       devtype='physical'
     fi
-  done < <(find /sys/class/net -mindepth 1 -maxdepth 1 -lname '*virtual*' \
-    -prune -o -printf '%f\n')
+  done < <(find /sys/class/net -mindepth 1 -maxdepth 1 ! -lname '*virtual*' \
+    -printf '%f\n')
 }
 
 get_info() {
@@ -363,23 +363,23 @@ opts_prompt() {
 }
 
 opts_fmt() {
-  local tmp item
+  local str item tmp
 
   case ${#opts[@]} in
     1)
       errfmt "${opts[*]} is"
       ;;
     2)
-      tmp=${opts[*]/%/ and}
+      str=${opts[*]/%/ and}
 
-      errfmt "${tmp% and} are"
+      errfmt "${str% and} are"
       ;;
     *)
       item=${opts[-2]}
       tmp=${opts[*]/%/,}
-      tmp=${tmp/${item},/${item} and}
+      str=${tmp/${item},/${item} and}
 
-      errfmt "${tmp%,} are"
+      errfmt "${str%,} are"
   esac
 }
 
