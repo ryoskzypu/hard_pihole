@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+asdf#!/bin/bash
+
+#depends=(bar foo awk dig foobar find grep ip ss sudo systemctl)
+#depends=(bar)
+#depends=(bar foobar)
+depends=(bar foobar xyz)
+opts=()
+err='see help for dependencies (hard_pihole -h)'
+
+err_fmt() {
+  printf '%s not installed. will break status checking\n%s\n' "$1" "$err" >&2
+}
+
+for dep in "${depends[@]}"; do
+  if ! command -v "$dep" > /dev/null 2>&1; then
+    case $dep in
+      foo) printf 'ERROR: %s install is required\n%s\n' "$dep" "$err"; exit 1 ;;
+      *) opts+=("$dep")
+    esac
+  fi
+done
+
+if [[ -n ${opts[*]} ]]; then
+  case ${#opts[@]} in
+    1)
+      err_fmt "${opts[*]} is"
+      ;;
+    2)
+      tmp=${opts[*]/%/ and}
+
+      err_fmt "${tmp% and} are"
+      ;;
+    *)
+      item=${opts[-2]}
+      tmp=${opts[*]/%/,}
+      tmp=${tmp/${item},/${item} and}
+
+      err_fmt "${tmp%,} are"
+  esac
+fi
