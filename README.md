@@ -24,7 +24,7 @@ Then prompts to:
 `chmod u+x hard_pihole`
 
 ## Usage
-`sudo ./hard_pihole`
+`./hard_pihole`
 
 [this]: <https://www.reddit.com/r/pihole/comments/x7wns0/pihole_hardening_tips_4fun/>
 [/r/pihole]: <https://www.reddit.com/r/pihole/>
