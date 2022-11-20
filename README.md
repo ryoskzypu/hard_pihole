@@ -19,7 +19,7 @@ Then prompts to:
 - firewalld or UFW
 
 ## Installation
-`wget -O hard_pihole` [`copy and paste this link`]
+`curl -sSO` [`copy & paste this link`]
 
 `chmod u+x hard_pihole`
 
@@ -29,4 +29,4 @@ Then prompts to:
 [this]: <https://www.reddit.com/r/pihole/comments/x7wns0/pihole_hardening_tips_4fun/>
 [/r/pihole]: <https://www.reddit.com/r/pihole/>
 [Pi-hole]: <https://github.com/pi-hole/pi-hole>
-[`copy and paste this link`]: <https://github.com/ryoskzypu/hard_pihole/raw/main/hard_pihole>
+[`copy & paste this link`]: <https://github.com/ryoskzypu/hard_pihole/raw/main/hard_pihole>
