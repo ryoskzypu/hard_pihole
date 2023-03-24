@@ -10,6 +10,8 @@
 #   supports Firewalld and UFW, can apply rules directly with --restrict option,
 #   can reset the firewall and apply rules recommended by Pi-hole, and display
 #   the system's general networking information.
+#   The script assumes a GNU/Linux system with default firewall settings, hence it
+#   is recommended to do a --reset before applying rules.
 # Rationale:
 #   Many Pi-hole users run with their router's DNS port forwarded by misconfiguration,
 #   thus opened on the internet. Additionally, configuring firewall rules manually can
@@ -138,7 +140,7 @@ apply_ufw_rules() {
   printf '%s\n' 'OK'
 }
 
-get_rules() {
+parse_rules() {
   case $1 in
     pihole)
       case $firewall in
@@ -192,17 +194,17 @@ parse_ips() {
   if ((parse)); then
     if [[ -n ${pihole_ips[*]} ]]; then
       validate_ip 'Pi-hole' "${pihole_ips[@]}"
-      get_rules pihole
+      parse_rules pihole
     fi
 
     if [[ -n ${ssh_ips[*]} ]]; then
       validate_ip 'SSH' "${ssh_ips[@]}"
-      get_rules ssh
+      parse_rules ssh
     fi
 
     if [[ -n ${web_ips[*]} ]]; then
       validate_ip 'Web interface' "${web_ips[@]}"
-      get_rules web
+      parse_rules web
     fi
   else
     die 'no IPs were found to be parsed'
@@ -251,7 +253,7 @@ server_status() {
     web) port=80 target='Web'
   esac
 
-  service=$(sudo ss -ntlp4 | awk -v var="$port" '$4 ~/:var$/ {split($6, str, /"/); print str[2]}')
+  service=$(sudo ss -ntlp4 | awk -v var=":${port}$" '$4 ~ var {split($6, str, /"/); print str[2]}')
 
   printf '%s\n' "$target server status:"
 
@@ -259,16 +261,21 @@ server_status() {
     print_fmt "$service server: OK"
     service_status "$service"
   else
-    print_fmt "${service,,} server: not detected"
+    print_fmt "$service server: not detected"
     printf '\n'
   fi
 }
 
 service_status() {
-  local status activity
+  local service status activity
 
-  status=$(systemctl is-enabled "$1")
-  activity=$(systemctl is-active "$1")
+  case $1 in
+    sshd) service=${1%d} ;;
+    *) service=$1
+  esac
+
+  status=$(systemctl is-enabled "$service")
+  activity=$(systemctl is-active "$service")
 
   print_fmt "service: $status and $activity"
   printf '\n'
@@ -366,9 +373,8 @@ network_status() {
   fi
 }
 
-get_summary() {
-  sudo pihole status
-  printf '\n'
+get_fw_rules() {
+  printf '%s\n' "Additional $firewall status and rules:"
 
   case $firewall in
     firewalld) sudo firewall-cmd --zone=public --list-all ;;
@@ -382,7 +388,7 @@ show_info() {
   firewall_status
   server_status web
   server_status ssh
-  get_summary
+  get_fw_rules
 }
 
 set_fw_vars() {
