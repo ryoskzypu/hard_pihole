@@ -49,7 +49,7 @@ With no options, $prog will source the default ~/$cfgname file and run.
 Options:
   -h, --help                    display this help and exit
       --config-path=PATH        set path of config file
-  -i, --info                    output all MODEs information and exit
+  -i, --info                    output all MODEs status information and exit
   -q, --quiet                   show no output
   -r, --restrict MODE <IP> ...  restrict MODEs by IP address
   -R, --reset                   reset firewall and apply the recommended Pi-hole rules
@@ -289,7 +289,7 @@ firewall_status() {
     ufw) status=$(sudo ufw status verbose | awk '/Status/ {print $2}')
   esac
 
-  printf '%s\n' 'Firewall status:'
+  printf '%s\n' 'Firewall:'
   print_fmt "$firewall install: OK"
   print_fmt "status: $status"
 
@@ -302,7 +302,7 @@ pihole_status() {
   status=$(sudo pihole status | grep -E 'DNS|FTL')
   blocking=$(sudo pihole status | awk '/Pi/ {print $5}')
 
-  printf '%s\n' 'Pi-hole status:'
+  printf '%s\n' 'Pi-hole:'
   print_fmt 'pi-hole install: OK'
   print_fmt "status: ${status#*] }"
   print_fmt "blocking: $blocking"
@@ -356,7 +356,7 @@ network_status() {
     get_method
     get_dns
 
-    printf '%s\n' 'Network status:'
+    printf '%s\n' 'Network:'
     print_fmt 'status: connected'
     print_fmt "interface: $device"
     print_fmt "type: ${linktype:-ethernet} [${devtype:-virtual}]"
@@ -374,12 +374,20 @@ network_status() {
 }
 
 get_fw_rules() {
-  printf '%s\n' "Additional $firewall status and rules:"
+  local fw cmd
 
   case $firewall in
-    firewalld) sudo firewall-cmd --zone=public --list-all ;;
-    ufw) sudo ufw status verbose
+    firewalld)
+      fw=${firewall^}
+      cmd=(sudo firewall-cmd --zone=public --list-all)
+      ;;
+    ufw)
+      fw=${firewall^^}
+      cmd=(sudo ufw status verbose)
   esac
+
+  printf '%s\n' "$fw rules:"
+  "${cmd[@]}"
 }
 
 show_info() {
