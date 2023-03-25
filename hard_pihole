@@ -255,7 +255,7 @@ server_status() {
 
   service=$(sudo ss -ntlp4 | awk -v var=":${port}$" '$4 ~ var {split($6, str, /"/); print str[2]}')
 
-  printf '%s\n' "$target server status:"
+  printf '%s\n' "$target server:"
 
   if [[ -n $service ]]; then
     print_fmt "$service server: OK"
@@ -374,7 +374,7 @@ network_status() {
 }
 
 get_fw_rules() {
-  local fw cmd
+  local fw cmd cmd_arr
 
   case $firewall in
     firewalld)
@@ -386,8 +386,10 @@ get_fw_rules() {
       cmd=(sudo ufw status verbose)
   esac
 
-  printf '%s\n' "$fw rules:"
-  "${cmd[@]}"
+  readarray -t cmd_arr < <(printf '%s\n' "${cmd[@]}")
+
+  printf '%s\n' "$fw:"
+  printf '  %s\n' "${cmd_arr[@]}"
 }
 
 show_info() {
