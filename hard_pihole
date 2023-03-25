@@ -245,6 +245,25 @@ reset_rules() {
   exit 0
 }
 
+get_fw_rules() {
+  local fw cmd cmd_arr
+
+  case $firewall in
+    firewalld)
+      fw=${firewall^}
+      cmd=(sudo firewall-cmd --zone=public --list-all)
+      ;;
+    ufw)
+      fw=${firewall^^}
+      cmd=(sudo ufw status verbose)
+  esac
+
+  readarray -t cmd_arr < <(printf '%s\n' "$("${cmd[@]}")")
+
+  printf '%s\n' "$fw"
+  printf '  %s\n' "${cmd_arr[@]}"
+}
+
 server_status() {
   local port target service
 
@@ -255,7 +274,7 @@ server_status() {
 
   service=$(sudo ss -ntlp4 | awk -v var=":${port}$" '$4 ~ var {split($6, str, /"/); print str[2]}')
 
-  printf '%s\n' "$target server:"
+  printf '%s\n' "$target server"
 
   if [[ -n $service ]]; then
     print_fmt "$service server: OK"
@@ -289,7 +308,7 @@ firewall_status() {
     ufw) status=$(sudo ufw status verbose | awk '/Status/ {print $2}')
   esac
 
-  printf '%s\n' 'Firewall:'
+  printf '%s\n' 'Firewall'
   print_fmt "$firewall install: OK"
   print_fmt "status: $status"
 
@@ -302,7 +321,7 @@ pihole_status() {
   status=$(sudo pihole status | grep -E 'DNS|FTL')
   blocking=$(sudo pihole status | awk '/Pi/ {print $5}')
 
-  printf '%s\n' 'Pi-hole:'
+  printf '%s\n' 'Pi-hole'
   print_fmt 'pi-hole install: OK'
   print_fmt "status: ${status#*] }"
   print_fmt "blocking: $blocking"
@@ -356,7 +375,7 @@ network_status() {
     get_method
     get_dns
 
-    printf '%s\n' 'Network:'
+    printf '%s\n' 'Network'
     print_fmt 'status: connected'
     print_fmt "interface: $device"
     print_fmt "type: ${linktype:-ethernet} [${devtype:-virtual}]"
@@ -371,25 +390,6 @@ network_status() {
     print_fmt 'status: disconnected'
     printf '\n'
   fi
-}
-
-get_fw_rules() {
-  local fw cmd cmd_arr
-
-  case $firewall in
-    firewalld)
-      fw=${firewall^}
-      cmd=(sudo firewall-cmd --zone=public --list-all)
-      ;;
-    ufw)
-      fw=${firewall^^}
-      cmd=(sudo ufw status verbose)
-  esac
-
-  readarray -t cmd_arr < <(printf '%s\n' "${cmd[@]}")
-
-  printf '%s\n' "$fw:"
-  printf '  %s\n' "${cmd_arr[@]}"
 }
 
 show_info() {
