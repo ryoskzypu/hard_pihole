@@ -1,4 +1,4 @@
-#!/bin/bash
+
 # shellcheck disable=SC2015
 #
 # hard_pihole
@@ -38,7 +38,6 @@ shopt -s extglob
 prog=${0##*/}
 usage="usage: $prog [--config-path=] [--help] [--info] [--quiet] [--reset] [--restrict] [--verbose] [--version]"
 cfgname=.${prog}.cfg
-#config_path=${1:-$HOME/$cfgname}
 version='2.0'
 
 show_help() {
@@ -191,23 +190,19 @@ validate_ip() {
 }
 
 parse_ips() {
-  if ((parse)); then
-    if [[ -n ${pihole_ips[*]} ]]; then
-      validate_ip 'Pi-hole' "${pihole_ips[@]}"
-      parse_rules pihole
-    fi
+  if [[ -n ${pihole_ips[*]} ]]; then
+    validate_ip 'Pi-hole' "${pihole_ips[@]}"
+    parse_rules pihole
+  fi
 
-    if [[ -n ${ssh_ips[*]} ]]; then
-      validate_ip 'SSH' "${ssh_ips[@]}"
-      parse_rules ssh
-    fi
+  if [[ -n ${ssh_ips[*]} ]]; then
+    validate_ip 'SSH' "${ssh_ips[@]}"
+    parse_rules ssh
+  fi
 
-    if [[ -n ${web_ips[*]} ]]; then
-      validate_ip 'Web interface' "${web_ips[@]}"
-      parse_rules web
-    fi
-  else
-    die 'no IPs were found to be parsed'
+  if [[ -n ${web_ips[*]} ]]; then
+    validate_ip 'Web interface' "${web_ips[@]}"
+    parse_rules web
   fi
 }
 
@@ -486,7 +481,7 @@ check_install() {
 
   depends=(
     'sudo'
-    'pihole'
+    #'pihole'
     'systemctl'
     'timeout'
     'ip'
@@ -508,12 +503,11 @@ check_install() {
 }
 
 parse_args() {
-  local arg err
+  local arg
 
   pihole_ips=()
   ssh_ips=()
   web_ips=()
-  err='empty argument'
 
   while (($#)); do
     : \$@: "$@"
@@ -523,7 +517,6 @@ parse_args() {
       --version|-v) die 0 "$prog v$version" ;;
       --info|-i) check_install > /dev/null; show_info; exit 0 ;;
       --verbose|-V) verb=1; shift ;;
-      --config-path) ;;
       --quiet|-q) quiet=1; shift ;;
       --reset|-R) reset=1; shift ;;
       --restrict|-r)
@@ -535,28 +528,35 @@ parse_args() {
             shift
             for arg; do
               : \$arg: "$arg"
-              [[ -z $arg ]] && die "$err"
-              [[ $arg = -* ]] && break || { parse=1; pihole_ips+=("$arg"); shift; }
+              [[ $arg = -* ]] && break || { pihole_ips+=("$arg"); shift; }
             done
             ;;
           ssh)
             shift
             for arg; do
-              [[ -z $arg ]] && die "$err"
-              [[ $arg = -* ]] && break || { parse=1; ssh_ips+=("$arg"); shift; }
+              [[ $arg = -* ]] && break || { ssh_ips+=("$arg"); shift; }
             done
             ;;
           web)
             shift
             for arg; do
-              [[ -z $arg ]] && die "$err"
-              [[ $arg = -* ]] && break || { parse=1; web_ips+=("$arg"); shift; }
+              [[ $arg = -* ]] && break || { web_ips+=("$arg"); shift; }
             done
         esac
+        ;;
+      --config-path=*) cfgpath=${1#*=}; shift
         ;;
       *) die "invalid '$1' option"
     esac
   done
+}
+
+parse_cfgfile() {
+  config_path=${cfgpath:-$HOME/$cfgname}
+
+  if [[ ! -f $config_path ]]; then
+    :
+  fi
 }
 
 parse_args "$@"
@@ -568,4 +568,5 @@ parse_args "$@"
 
 check_install
 ((reset)) && reset_rules
-((restrict)) && parse_ips
+((restrict)) && { parse_ips; exit $?; }
+parse_cfgfile
