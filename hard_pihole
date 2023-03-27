@@ -1,17 +1,19 @@
-
+#!/bin/bash
 # shellcheck disable=SC2015
 #
 # hard_pihole
 #
-# A Pi-hole hardening command-line tool.
+# Hardening command-line tool for Pi-hole.
 #
 # Usage:
-#   This script applies desktop firewall whitelist rules from its config file. It
-#   supports Firewalld and UFW, can apply rules directly with --restrict option,
+#   This script applies desktop firewall whitelist rules from its config file. The
+#   default config filepath is "$HOME", but can be specified with '--config-path='
+#   option.
+#   It supports Firewalld and UFW, can apply rules directly with '--restrict' option,
 #   can reset the firewall and apply rules recommended by Pi-hole, and display
 #   the system's general networking information.
 #   The script assumes a GNU/Linux system with default firewall settings, hence it
-#   is recommended to do a --reset before applying rules.
+#   is recommended to do a '--reset' before applying rules.
 # Rationale:
 #   Many Pi-hole users run with their router's DNS port forwarded by misconfiguration,
 #   thus opened on the internet. Additionally, configuring firewall rules manually can
@@ -24,13 +26,15 @@
 #   https://reddit.com/r/pihole/comments/x7wns0/pihole_hardening_tips_4fun
 #
 # TODO:
-#   - Rewrite the script in Unix style
+#   - Rewrite the script in Unix/GNU style
 #   - Replace noisy prompts and interactivity with options
 #   - Add config file
 #   - Add bash completion
-#   - Add makefile install
-#   - Add new features on github releases
-#   - Add PGP signature on github releases
+#   - Add man page
+#   - Add makefile
+#   - Add new features and PGP sig on github releases
+#   - Add unit testing
+#   - Add automated unit tests with github workflows
 #   - Rewrite README
 
 shopt -s extglob
@@ -80,9 +84,23 @@ is_installed() { command -v "$@" > /dev/null 2>&1; }
 
 is_connected() { timeout 1 bash -c '> /dev/tcp/1.1.1.1/53' 2> /dev/null; }
 
-print_fmt() { printf '  %s\n' "$@"; }
+printfmt() { printf '  %s\n' "$@"; }
 
 errfmt() { printf '%s\n' "INFO: $* not installed (status output will break)" >&2; }
+
+parse_cfgfile() {
+  local config_path exp_tilde
+
+  config_path=${cfgpath:-$HOME/$cfgname}
+  exp_tilde=${config_path/~'/'/$HOME/}
+
+  if [[ ! -s $exp_tilde ]]; then
+    die "nonexistent or empty '$exp_tilde' config file (run 'make' from Makefile dir to see install usage)"
+  fi
+
+  # shellcheck source=/dev/null
+  source "$exp_tilde"
+}
 
 apply_fwd_rules() {
   local service ips err ip
@@ -181,7 +199,7 @@ validate_ip() {
   if [[ -n ${invalid_ips[*]} ]]; then
     {
       printf '%s\n' 'Invalid IPs:'
-      print_fmt "${invalid_ips[@]}"
+      printfmt "${invalid_ips[@]}"
     } >&2
     die "failed to validate IPs (see --help for a valid input)"
   fi
@@ -190,19 +208,26 @@ validate_ip() {
 }
 
 parse_ips() {
+  local parse
+
   if [[ -n ${pihole_ips[*]} ]]; then
+    parse=1
     validate_ip 'Pi-hole' "${pihole_ips[@]}"
     parse_rules pihole
   fi
-
   if [[ -n ${ssh_ips[*]} ]]; then
+    parse=1
     validate_ip 'SSH' "${ssh_ips[@]}"
     parse_rules ssh
   fi
-
   if [[ -n ${web_ips[*]} ]]; then
+    parse=1
     validate_ip 'Web interface' "${web_ips[@]}"
     parse_rules web
+  fi
+
+  if ((!parse)); then
+    die 0 'No IPs were found to be parsed.'
   fi
 }
 
@@ -272,10 +297,10 @@ server_status() {
   printf '%s\n' "$target server"
 
   if [[ -n $service ]]; then
-    print_fmt "$service server: OK"
+    printfmt "$service server: OK"
     service_status "$service"
   else
-    print_fmt "$service server: not detected"
+    printfmt "$service server: not detected"
     printf '\n'
   fi
 }
@@ -291,7 +316,7 @@ service_status() {
   status=$(systemctl is-enabled "$service")
   activity=$(systemctl is-active "$service")
 
-  print_fmt "service: $status and $activity"
+  printfmt "service: $status and $activity"
   printf '\n'
 }
 
@@ -304,8 +329,8 @@ firewall_status() {
   esac
 
   printf '%s\n' 'Firewall'
-  print_fmt "$firewall install: OK"
-  print_fmt "status: $status"
+  printfmt "$firewall install: OK"
+  printfmt "status: $status"
 
   service_status "${firewall}"
 }
@@ -317,9 +342,9 @@ pihole_status() {
   blocking=$(sudo pihole status | awk '/Pi/ {print $5}')
 
   printf '%s\n' 'Pi-hole'
-  print_fmt 'pi-hole install: OK'
-  print_fmt "status: ${status#*] }"
-  print_fmt "blocking: $blocking"
+  printfmt 'pi-hole install: OK'
+  printfmt "status: ${status#*] }"
+  printfmt "blocking: $blocking"
 
   service_status pihole-FTL
 }
@@ -358,7 +383,6 @@ get_net_info() {
   mac=$(< "/sys/class/net/$device/address")
   route=$(ip -o -4 route show dev "$device" proto kernel scope link | awk '{print $1}')
   wanip=$(dig +short TXT whoami.ds.akahelp.net | awk -F'"' '{print $4}')
-
 }
 
 network_status() {
@@ -371,29 +395,36 @@ network_status() {
     get_dns
 
     printf '%s\n' 'Network'
-    print_fmt 'status: connected'
-    print_fmt "interface: $device"
-    print_fmt "type: ${linktype:-ethernet} [${devtype:-virtual}]"
-    print_fmt "MAC: $mac"
-    print_fmt "route: $route"
-    print_fmt "gateway: $gateway"
-    print_fmt "private IP: $lanip [$method]"
-    print_fmt "public IP: $wanip"
-    print_fmt "primary DNS: $dns"
+    printfmt 'status: connected'
+    printfmt "interface: $device"
+    printfmt "type: ${linktype:-ethernet} [${devtype:-virtual}]"
+    printfmt "MAC: $mac"
+    printfmt "route: $route"
+    printfmt "gateway: $gateway"
+    printfmt "private IP: $lanip [$method]"
+    printfmt "public IP: $wanip"
+    printfmt "primary DNS: $dns"
     printf '\n'
   else
-    print_fmt 'status: disconnected'
+    printfmt 'status: disconnected'
     printf '\n'
   fi
 }
 
 show_info() {
-  network_status
-  pihole_status
-  firewall_status
-  server_status web
-  server_status ssh
-  get_fw_rules
+  printf '%s\n' 'Checking status information...'
+
+  {
+    network_status
+    pihole_status
+    firewall_status
+    server_status web
+    server_status ssh
+    get_fw_rules
+  } >&3
+
+  printf '%s\n' 'OK'
+  exit 0
 }
 
 set_fw_vars() {
@@ -515,7 +546,7 @@ parse_args() {
     case $1 in
       --help|-h) show_help; exit 0 ;;
       --version|-v) die 0 "$prog v$version" ;;
-      --info|-i) check_install > /dev/null; show_info; exit 0 ;;
+      --info|-i) info=1; shift ;;
       --verbose|-V) verb=1; shift ;;
       --quiet|-q) quiet=1; shift ;;
       --reset|-R) reset=1; shift ;;
@@ -544,29 +575,22 @@ parse_args() {
             done
         esac
         ;;
-      --config-path=*) cfgpath=${1#*=}; shift
-        ;;
+      --config-path=*) cfgpath=${1#*=}; shift ;;
       *) die "invalid '$1' option"
     esac
   done
-}
-
-parse_cfgfile() {
-  config_path=${cfgpath:-$HOME/$cfgname}
-
-  if [[ ! -f $config_path ]]; then
-    :
-  fi
 }
 
 parse_args "$@"
 #declare -p pihole_ips
 #declare -p ssh_ips
 #declare -p web_ips
-((quiet)) && exec > /dev/null 2>&1
+exec 3>&1
+((quiet)) && { exec 3>&-; exec > /dev/null 2>&1; }
 ((!verb)) && exec > /dev/null
 
 check_install
+((info)) && show_info
 ((reset)) && reset_rules
 ((restrict)) && { parse_ips; exit $?; }
-parse_cfgfile
+parse_cfgfile && parse_ips
