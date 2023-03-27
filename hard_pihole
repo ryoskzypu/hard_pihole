@@ -111,7 +111,9 @@ apply_fwd_rules() {
 
   printf '%s\n' 'Applying firewalld rules...'
 
-  sudo firewall-cmd --permanent --remove-service="$service" || die "$err"
+  if sudo firewall-cmd --zone=public --query-service="$service" > /dev/null; then
+    sudo firewall-cmd --permanent --remove-service="$service" || die "$err"
+  fi
 
   for ip in "${ips[@]}"; do
     sudo firewall-cmd --permanent --add-rich-rule="rule family=ipv4 \
@@ -125,18 +127,21 @@ apply_fwd_rules() {
 }
 
 apply_ufw_rules() {
-  local port ips err ip
+  local port ips service_status err ip
 
   port=$1; shift
   readarray -t ips < <(printf '%s\n' "$@")
+  service_status=$(sudo ufw status | awk -v var="^${port}/" '$1 ~ var && $3 == "Anywhere"')
   err='failed to apply ufw rule'
 
   printf '%s\n' 'Applying ufw rules...'
 
-  case $port in
-    53) { sudo ufw delete allow 53/tcp && sudo ufw delete allow 53/udp; } || die "$err" ;;
-    22|80) sudo ufw delete allow "$port"/tcp || die "$err"
-  esac
+  if [[ -n ${service_status[*]} ]]; then
+    case $port in
+      53) { sudo ufw delete allow 53/tcp && sudo ufw delete allow 53/udp; } || die "$err" ;;
+      22|80) sudo ufw delete allow "$port"/tcp || die "$err"
+    esac
+  fi
 
   for ip in "${ips[@]}"; do
     case $port in
