@@ -102,6 +102,19 @@ parse_cfgfile() {
   source "$exp_tilde"
 }
 
+reload_firewall() {
+  local err="failed to reload $firewall"
+
+  printf '%s\n' "Reloading $firewall..."
+
+  case $firewall in
+    firewalld) sudo firewall-cmd --reload || die "$err" ;;
+    ufw) sudo ufw reload || die "$err" ;;
+  esac
+
+  printf '%s\n' 'OK'
+}
+
 apply_fwd_rules() {
   local service ips err ip
 
@@ -119,9 +132,6 @@ apply_fwd_rules() {
     sudo firewall-cmd --permanent --add-rich-rule="rule family=ipv4 \
       source address=$ip service name=$service accept" || die "$err"
   done
-
-  printf '%s\n' 'Reloading firewalld...'
-  sudo firewall-cmd --reload || die 'failed to reload firewalld'
 
   printf '%s\n' 'OK'
 }
@@ -156,13 +166,12 @@ apply_ufw_rules() {
     esac
   done
 
-  printf '%s\n' 'Reloading ufw...'
-  sudo ufw reload || die 'failed to reload ufw'
-
   printf '%s\n' 'OK'
 }
 
 parse_rules() {
+  parse=1
+
   case $1 in
     pihole)
       case $firewall in
@@ -216,17 +225,14 @@ parse_ips() {
   local parse
 
   if [[ -n ${pihole_ips[*]} ]]; then
-    parse=1
     validate_ip 'Pi-hole' "${pihole_ips[@]}"
     parse_rules pihole
   fi
   if [[ -n ${ssh_ips[*]} ]]; then
-    parse=1
     validate_ip 'SSH' "${ssh_ips[@]}"
     parse_rules ssh
   fi
   if [[ -n ${web_ips[*]} ]]; then
-    parse=1
     validate_ip 'Web interface' "${web_ips[@]}"
     parse_rules web
   fi
@@ -234,6 +240,8 @@ parse_ips() {
   if ((!parse)); then
     die 0 'No IPs were found to be parsed.'
   fi
+
+  reload_firewall
 }
 
 reset_rules() {
