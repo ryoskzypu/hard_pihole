@@ -1,12 +1,12 @@
-DESTDIR ?=
 prog := hard_pihole
-prefix := $(HOME)/.local
-bindir := $(prefix)/bin
-mandir := $(prefix)/share/man
-bash_compdir := $(prefix)/share/bash-completion/completions
+DESTDIR ?=
+PREFIX ?= $(HOME)/.local
+bindir := $(PREFIX)/bin
+mandir := $(PREFIX)/share/man
+bash_compdir := $(PREFIX)/share/bash-completion/completions
 
+CFGPATH ?= $(HOME)
 cfg_filename := $(prog).cfg
-cfg_path := $(HOME)
 
 .PHONY: all
 all:
@@ -18,15 +18,15 @@ all:
 		'  make uninstall    uninstall the package' \
 		'' \
 		'Examples:' \
-		'  $$ sudo make prefix=/usr/local install' \
+		'  $$ sudo make PREFIX=/usr/local install' \
 		'    install $(prog) system-wide'  \
 		'' \
-		'  $$ make cfg_path=/path install-cfg' \
+		'  $$ make CFGPATH=/path install-cfg' \
 		'    install $(cfg_filename) in custom path' \
 		'' \
 		'Note:' \
-		'  If prefix= or cfg_path= were used for installs, they must' \
-		'  be used for the uninstall target.'
+		'  The PREFIX and CFGPATH environment variables can be exported in' \
+		'  the shell, hence set on the install and uninstall targets invocation.'
 
 
 .PHONY: lint
@@ -39,7 +39,7 @@ test:
 
 .PHONY: install-cfg
 install-cfg:
-	@install -m 0755 -v $(cfg_filename) "$(cfg_path)/.$(cfg_filename)"
+	@install -m 0755 -v $(cfg_filename) "$(CFGPATH)/.$(cfg_filename)"
 
 .PHONY: install
 install: install-cfg
@@ -50,7 +50,7 @@ install: install-cfg
 .PHONY: uninstall
 uninstall:
 	@rm -vrf \
-		"$(cfg_path)/.$(cfg_filename)" \
+		"$(CFGPATH)/.$(cfg_filename)" \
 		"$(DESTDIR)$(bindir)/$(prog)" \
 		"$(DESTDIR)$(mandir)/man1/$(prog).1" \
 		"$(DESTDIR)$(bash_compdir)/$(prog)"

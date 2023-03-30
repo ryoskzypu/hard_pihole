@@ -1,5 +1,5 @@
 #!/bin/bash
-# shellcheck disable=2015,2034
+# shellcheck disable=2015
 #
 # hard_pihole
 #
@@ -50,10 +50,12 @@ Usage: $prog [OPTION]...
 Pi-hole hardening command-line tool.
 Apply allowlist desktop firewall rules from its config file.
 
-With no OPTION, load the default ~/$cfgname file.
+With no --config-path= OPTION, set PATH to the user's home directory.
+With the --restrict= OPTION, do not parse the config file.
 
 Options:
       --config-path=PATH  set PATH of config file
+  -d, --delete=MODE IP    delete IP address of MODE
   -h, --help              display this help and exit
   -i, --info              output all MODEs status information and exit
   -n, --dry-run           print firewall commands without execution
@@ -99,11 +101,16 @@ printfmt() { printf '  %s\n' "$@"; }
 
 errfmt() { printf '%s\n' "INFO: $* not installed (status output will break)" >&2; }
 
+check_cfgpath() {
+  expand_tilde=${1/~'/'/$HOME/}
+  [[ ! -d $expand_tilde ]] && die "nonexistent '$1' PATH"
+}
+
 parse_cfgfile() {
   local filepath expand_tilde line mode
 
-  filepath=${cfgpath:-$HOME}
-  expand_tilde=${filepath/~'/'/$HOME/}
+  filepath=${CFGPATH:-$HOME}
+  check_cfgpath "$filepath"
 
   if [[ ! -s $expand_tilde/$cfgname ]]; then
     die "nonexistent or empty '$cfgname' config file"
@@ -141,6 +148,7 @@ reload_firewall() {
   printf '%s\n' 'OK'
 }
 
+# shellcheck disable=2086
 apply_fwd_rules() {
   local service err ip
 
@@ -149,7 +157,7 @@ apply_fwd_rules() {
 
   printf '%s\n' 'Applying firewalld rules...'
 
-  if sudo firewall-cmd --zone=public --query-service="$service" > /dev/null; then
+  if ((!delete)) && sudo firewall-cmd --zone=public --query-service="$service" > /dev/null; then
     printf '%s\n' "Removing $service service..."
     $print sudo firewall-cmd --permanent --remove-service="$service" >&$((1 + fd)) || die "$err"
   fi
@@ -157,13 +165,14 @@ apply_fwd_rules() {
   for ip in "${mode_ips[@]}"; do
     printf '%s\n' "Allowing $ip IP to access the $service service..."
 
-    $print sudo firewall-cmd --permanent --add-rich-rule="rule family=ipv4 \
+    $print sudo firewall-cmd --permanent --${cmd:-add}-rich-rule="rule family=ipv4 \
       source address=$ip service name=$service accept" >&$((1 + fd)) || die "$err"
   done
 
   printf '%s\n' 'OK'
 }
 
+# shellcheck disable=2086
 apply_ufw_rules() {
   local portnr service_status err port ip
 
@@ -179,7 +188,7 @@ apply_ufw_rules() {
 
   printf '%s\n' 'Applying ufw rules...'
 
-  if [[ -n ${service_status[*]} ]]; then
+  if ((!delete)) && [[ -n ${service_status[*]} ]]; then
     printf '%s\n' "Removing $port port rules..."
 
     case $portnr in
@@ -194,12 +203,12 @@ apply_ufw_rules() {
     case $portnr in
       53)
         {
-          $print sudo ufw allow proto tcp from "$ip" to any port 53
-          $print sudo ufw allow proto udp from "$ip" to any port 53
+          $print sudo ufw $cmd allow proto tcp from "$ip" to any port 53
+          $print sudo ufw $cmd allow proto udp from "$ip" to any port 53
         } >&$((1 + fd)) || die "$err"
         ;;
       22|80)
-        $print sudo ufw allow proto tcp from "$ip" to any port "$portnr" >&$((1 + fd)) || die "$err"
+        $print sudo ufw $cmd allow proto tcp from "$ip" to any port "$portnr" >&$((1 + fd)) || die "$err"
     esac
   done
 
@@ -233,6 +242,15 @@ parse_rules() {
   esac
 }
 
+check_delete() {
+  if ((delete)); then
+    case $firewall in
+      firewalld) cmd='remove' ;;
+      ufw) cmd='delete'
+    esac
+  fi
+}
+
 validate_ip() {
   local invalid_ips range cidr ip_regex ip
 
@@ -260,13 +278,14 @@ validate_ip() {
 }
 
 parse_ips() {
-  local mode mode_ips parse
+  local mode mode_ips cmd parse
 
   for mode in pihole ssh web; do
     declare -n mode_ips=${mode}_ips
 
     if [[ -n ${mode_ips[*]} ]]; then
       validate_ip
+      check_delete
       parse_rules
     fi
   done
@@ -604,6 +623,7 @@ parse_modes() {
   readarray -t main_args < <(printf '%s\n' "$@")
 }
 
+# shellcheck disable=2034
 parse_args() {
   local mode expand_tilde
 
@@ -622,12 +642,18 @@ parse_args() {
       --quiet|-q) quiet=1; shift ;;
       --dry-run|-n) dry=1; shift ;;
       --reset|-R) reset=1; shift ;;
-      --restrict?(=*)|-r)
+      --@(delete|restrict)?(=*)|-@(d|r))
         : \$1: "$1"
-        restrict=1
+        case $1 in
+          *d*) delete=1 ;;
+          *r*) restrict=1
+        esac
+
+        ((delete && restrict)) && die 'mixed options --delete and --restrict'
+
         case $1 in
           --*=*) mode=${1#*=} ;;
-          -*) shift; mode=$1 ;;
+          -*) shift; mode=$1
         esac
 
         : \$mode: "$mode"
@@ -639,14 +665,12 @@ parse_args() {
         ;;
       --config-path?(=*))
         case $1 in
-          --*=*) cfgpath=${1#*=}; shift ;;
-          --*) shift; cfgpath=$1
+          --*=*) CFGPATH=${1#*=}; shift ;;
+          --*) shift; CFGPATH=$1
         esac
 
-        [[ -z $cfgpath ]] && die 'missing PATH'
-
-        expand_tilde=${cfgpath/~'/'/$HOME/}
-        [[ ! -d $expand_tilde ]] && die "nonexistent '$cfgpath' PATH"
+        [[ -z $CFGPATH ]] && die 'missing PATH'
+        check_cfgpath "$CFGPATH"
         ;;
       --) break ;;
       *) die "invalid '$1' option"
@@ -666,5 +690,5 @@ check_install
 ((info)) && show_info
 ((dry)) && print='echo' fd=2
 ((reset)) && reset_rules
-((restrict)) && { parse_ips; exit $?; }
+((delete || restrict)) && { parse_ips; exit $?; }
 parse_cfgfile && parse_ips
