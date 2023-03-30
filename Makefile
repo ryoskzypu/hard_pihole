@@ -1,4 +1,4 @@
-prog := hard_pihole
+prog := hardph
 DESTDIR ?=
 PREFIX ?= $(HOME)/.local
 bindir := $(PREFIX)/bin
@@ -31,7 +31,7 @@ all:
 
 .PHONY: lint
 lint:
-	shellcheck --shell=bash "$(prog)" "$(prog).bash-comp"
+	shellcheck --shell=bash "$(prog)" "$(prog).bashcomp"
 
 .PHONY: test
 test:
@@ -44,7 +44,7 @@ install-cfg:
 .PHONY: install
 install: install-cfg
 	@install -v -d "$(DESTDIR)$(mandir)/man1" && install -m 0644 -v $(prog).1 "$(DESTDIR)$(mandir)/man1/$(prog).1"
-	@install -v -d "$(DESTDIR)$(bash_compdir)" && install -m 0644 -v $(prog).bash-comp "$(DESTDIR)$(bash_compdir)/$(prog)"
+	@install -v -d "$(DESTDIR)$(bash_compdir)" && install -m 0644 -v $(prog).bashcomp "$(DESTDIR)$(bash_compdir)/$(prog)"
 	@install -v -d "$(DESTDIR)$(bindir)" && install -m 0755 -v $(prog) "$(DESTDIR)$(bindir)/$(prog)"
 
 .PHONY: uninstall

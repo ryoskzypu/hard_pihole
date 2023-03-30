@@ -1,9 +1,9 @@
 #!/bin/bash
 # shellcheck disable=2015
 #
-# hard_pihole
+# hardph
 #
-# Pi-hole hardening command-line tool.
+# Hardening command-line tool for Pi-hole.
 #
 # Usage:
 #   This script applies allowlist desktop firewall rules from its config file. The
@@ -47,7 +47,7 @@ show_help() {
 cat << END
 Usage: $prog [OPTION]...
   or:  $prog -r MODE IP...
-Pi-hole hardening command-line tool.
+Hardening command-line tool for Pi-hole.
 Apply allowlist desktop firewall rules from its config file.
 
 With no --config-path= OPTION, set PATH to the user's home directory.
@@ -86,7 +86,8 @@ die() {
 
   case $1 in
     [0-9]*) status=$1; shift ;;
-    *) status=1; err='ERROR: '
+    *) status=1; err="${prog}: "
+    #*) status=1; err='ERROR: '
   esac
 
   printf '%s\n' "${err}$*" >&$(( 1 + (status != 0) ))
@@ -99,7 +100,7 @@ is_connected() { timeout 1 bash -c '> /dev/tcp/1.1.1.1/53' 2> /dev/null; }
 
 printfmt() { printf '  %s\n' "$@"; }
 
-errfmt() { printf '%s\n' "INFO: $* not installed (status output will break)" >&2; }
+errfmt() { printf '%s\n' "$prog: $* not installed (status output will break)" >&2; }
 
 check_cfgpath() {
   expand_tilde=${1/~'/'/$HOME/}
@@ -135,6 +136,12 @@ parse_cfgfile() {
   done < "$expand_tilde/$cfgname"
 }
 
+fwfmt() {
+  ((!delete)) \
+    && printf '%s\n' "Allowing $ip IP to access the $1 $2..." \
+    || printf '%s\n' "Removing allowed $ip IP from $1 $2..."
+}
+
 reload_firewall() {
   local err="failed to reload $firewall"
 
@@ -159,11 +166,12 @@ apply_fwd_rules() {
 
   if ((!delete)) && sudo firewall-cmd --zone=public --query-service="$service" > /dev/null; then
     printf '%s\n' "Removing $service service..."
+
     $print sudo firewall-cmd --permanent --remove-service="$service" >&$((1 + fd)) || die "$err"
   fi
 
   for ip in "${mode_ips[@]}"; do
-    printf '%s\n' "Allowing $ip IP to access the $service service..."
+    fwfmt "$service" 'service'
 
     $print sudo firewall-cmd --permanent --${cmd:-add}-rich-rule="rule family=ipv4 \
       source address=$ip service name=$service accept" >&$((1 + fd)) || die "$err"
@@ -198,7 +206,7 @@ apply_ufw_rules() {
   fi
 
   for ip in "${mode_ips[@]}"; do
-    printf '%s\n' "Allowing $ip IP to access the $port port..."
+    fwfmt "$port" 'port'
 
     case $portnr in
       53)
@@ -649,7 +657,7 @@ parse_args() {
           *r*) restrict=1
         esac
 
-        ((delete && restrict)) && die 'mixed options --delete and --restrict'
+        ((delete && restrict)) && die 'mixed --delete= and --restrict= options'
 
         case $1 in
           --*=*) mode=${1#*=} ;;
@@ -659,8 +667,8 @@ parse_args() {
         : \$mode: "$mode"
         case $mode in
           pihole|ssh|web) parse_modes "$@"; [[ -z ${main_args[*]} ]] && set -- || set -- "${main_args[@]}" ;;
-          '') die 'missing MODE' ;;
-          *) die 'invalid MODE'
+          '') die 'missing MODE argument' ;;
+          *) die "invalid '$1' MODE"
         esac
         ;;
       --config-path?(=*))
@@ -669,7 +677,7 @@ parse_args() {
           --*) shift; CFGPATH=$1
         esac
 
-        [[ -z $CFGPATH ]] && die 'missing PATH'
+        [[ -z $CFGPATH ]] && die 'missing PATH argument'
         check_cfgpath "$CFGPATH"
         ;;
       --) break ;;
