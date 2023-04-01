@@ -79,18 +79,22 @@ Example:
     allow only the 192.168.0.1–254 range of IPs to access Pi-hole, also
     only the 192.168.0.3 and 192.168.0.7 IPs to access web interface.
 END
+
+exit 0
 }
+
+show_version() { printf '%s\n' "$prog $version"; exit 0; }
 
 die() {
   local status err
 
   case $1 in
     [0-9]*) status=$1; shift ;;
-    *) status=1; err="${prog}: "
-    #*) status=1; err='ERROR: '
+    *) status=1
   esac
+  err="${prog}: $1"; shift
 
-  printf '%s\n' "${err}$*" >&$(( 1 + (status != 0) ))
+  printf '%s\n' "$err" "$@" >&$(( 1 + (status != 0) ))
   exit "$status"
 }
 
@@ -104,7 +108,7 @@ errfmt() { printf '%s\n' "$prog: $* not installed (status output will break)" >&
 
 check_cfgpath() {
   expand_tilde=${1/~'/'/$HOME/}
-  [[ ! -d $expand_tilde ]] && die "nonexistent '$1' PATH"
+  [[ ! -d $expand_tilde ]] && die "nonexistent '$1' path"
 }
 
 parse_cfgfile() {
@@ -275,11 +279,11 @@ validate_ip() {
   done
 
   if [[ -n ${invalid_ips[*]} ]]; then
-    {
-      printf '%s\n' "Invalid $mode IPs:"
-      printfmt "${invalid_ips[@]}"
-    } >&2
-    die "failed to validate IPs (see --help for a valid input)"
+    die \
+      'failed to validate IPs' \
+      "Invalid $mode IPs:" \
+      "$(printfmt "${invalid_ips[@]}")" \
+      "$errhelp for a valid input."
   fi
 
   printf '%s\n' 'OK'
@@ -299,7 +303,7 @@ parse_ips() {
   done
 
   if ((!parse)); then
-    die 0 'No IPs were found to be parsed.'
+    die 0 'no IPs were found to be parsed'
   fi
 
   reload_firewall
@@ -374,8 +378,7 @@ server_status() {
     printfmt "$service server: OK"
     service_status "$service"
   else
-    printfmt "$service server: not detected"
-    printf '\n'
+    printfmt 'server: not detected' ''
   fi
 }
 
@@ -390,8 +393,7 @@ service_status() {
   status=$(systemctl is-enabled "$service")
   activity=$(systemctl is-active "$service")
 
-  printfmt "service: $status and $activity"
-  printf '\n'
+  printfmt "service: $status and $activity" ''
 }
 
 firewall_status() {
@@ -403,8 +405,9 @@ firewall_status() {
   esac
 
   printf '%s\n' 'Firewall'
-  printfmt "$firewall install: OK"
-  printfmt "status: $status"
+  printfmt \
+    "$firewall install: OK" \
+    "status: $status"
 
   service_status "$firewall"
 }
@@ -413,12 +416,13 @@ pihole_status() {
   local status blocking
 
   status=$(sudo pihole status | grep -E 'DNS|FTL')
-  blocking=$(sudo pihole status | awk '/Pi/ {print $5}')
+  blocking=$(sudo pihole status | awk '/Pi-hole/ {print $5}')
 
   printf '%s\n' 'Pi-hole'
-  printfmt 'pi-hole install: OK'
-  printfmt "status: ${status#*] }"
-  printfmt "blocking: $blocking"
+  printfmt \
+    'pi-hole install: OK' \
+    "status: ${status#*] }" \
+    "blocking: $blocking"
 
   service_status pihole-FTL
 }
@@ -468,20 +472,22 @@ network_status() {
     get_method
     get_dns
 
-    printf '%s\n' 'Network'
-    printfmt 'status: connected'
-    printfmt "interface: $device"
-    printfmt "type: ${linktype:-ethernet} [${devtype:-virtual}]"
-    printfmt "MAC: $mac"
-    printfmt "route: $route"
-    printfmt "gateway: $gateway"
-    printfmt "private IP: $lanip [$method]"
-    printfmt "public IP: $wanip"
-    printfmt "primary DNS: $dns"
-    printf '\n'
+    printf '%s\n' 'Network' \
+      "$(
+          printfmt \
+            'status: connected' \
+            "interface: $device" \
+            "type: ${linktype:-ethernet} [${devtype:-virtual}]" \
+            "MAC: $mac" \
+            "route: $route" \
+            "gateway: $gateway" \
+            "private IP: $lanip [$method]" \
+            "public IP: $wanip" \
+            "primary DNS: $dns" \
+            ''
+        )"
   else
-    printfmt 'status: disconnected'
-    printf '\n'
+    printfmt 'status: disconnected' ''
   fi
 }
 
@@ -519,7 +525,7 @@ check_fw_activity() {
   ufw=${installed[1]}
 
   if systemctl is-active "$firewalld" && systemctl is-active "$ufw"; then
-    die "$firewalld and $ufw are active"
+    die 'firewalld and ufw are active'
   fi
 }
 
@@ -610,7 +616,6 @@ check_install() {
 parse_modes() {
   local err arg
   : \$@: "$@"
-  : \$1: "$1"
   : \$mode: "$mode"
   declare -n mode_ips=${mode}_ips
   err="missing $mode IPs"; shift
@@ -622,35 +627,57 @@ parse_modes() {
     if [[ $arg = -* ]]; then
       [[ -z ${mode_ips[*]} ]] && die "$err" || break
     else
-       mode_ips+=("$arg"); shift
+      mode_ips+=("$arg"); shift
     fi
   done
 
   : \$@: "$@"
-  : \$1: "$1"
   readarray -t main_args < <(printf '%s\n' "$@")
+}
+
+parse_opts() {
+  local opts i
+
+  opts=$1
+
+  for ((i=0; i < ${#opts}; i++)); do
+    : "${opts:i:1}"
+    case ${opts:i:1} in
+      h) help=1 ;;
+      i) info=1 ;;
+      n) dry=1 ;;
+      q) quiet=1 ;;
+      R) reset=1 ;;
+      v) ver=1 ;;
+      V) verb=1
+    esac
+  done
+
+  ((help)) && show_help
+  ((ver)) && show_version
 }
 
 # shellcheck disable=2034
 parse_args() {
-  local mode expand_tilde
+  local opts mode short shortopt expand_tilde
 
   pihole_ips=()
   ssh_ips=()
   web_ips=()
+  errhelp="See '$prog --help'"
 
   while (($#)); do
     : \$@: "$@"
-    : \$1: "$1"
     case $1 in
-      --help|-h) show_help; exit 0 ;;
-      --version|-v) die 0 "$prog $version" ;;
-      --info|-i) info=1; shift ;;
-      --verbose|-V) verb=1; shift ;;
-      --quiet|-q) quiet=1; shift ;;
-      --dry-run|-n) dry=1; shift ;;
-      --reset|-R) reset=1; shift ;;
-      --@(delete|restrict)?(=*)|-@(d|r))
+      -+(h|i|n|q|R|v|V)) parse_opts "${@#-}"; shift ;;
+      --help) show_help ;;
+      --version) show_version ;;
+      --info) info=1; shift ;;
+      --dry-run) dry=1; shift ;;
+      --quiet) quiet=1; shift ;;
+      --reset) reset=1; shift ;;
+      --verbose) verb=1; shift ;;
+      --@(delete|restrict)?(=*)|-+(h|i|n|q|R|v|V)@(d|r)*([[:print:]])|-@(d|r)*([[:print:]]))
         : \$1: "$1"
         case $1 in
           *d*) delete=1 ;;
@@ -661,14 +688,25 @@ parse_args() {
 
         case $1 in
           --*=*) mode=${1#*=} ;;
-          -*) shift; mode=$1
+          --*) shift; mode=$1 ;;
+          -+(h|i|n|q|R|v|V)d?*|-d?*) short=1 opts=${1%d*} mode=${1#*d} ;;
+          -+(h|i|n|q|R|v|V)r?*|-r?*) short=1 opts=${1%r*} mode=${1#*r} ;;
+          -*) short=1 opts=${1%?}; shift; mode=$1
         esac
+        #echo "$opts"
+        #echo "$mode"
+        #echo "$@"
+        #exit
+        opts=${opts#-}
+        if ((short)) && [[ -n $opts ]]; then
+          parse_opts "$opts"
+        fi
 
         : \$mode: "$mode"
         case $mode in
           pihole|ssh|web) parse_modes "$@"; [[ -z ${main_args[*]} ]] && set -- || set -- "${main_args[@]}" ;;
-          '') die 'missing MODE argument' ;;
-          *) die "invalid '$1' MODE"
+          '') die 'missing mode argument' ;;
+          *) die "invalid '$mode' mode" "$errhelp for valid modes."
         esac
         ;;
       --config-path?(=*))
@@ -677,11 +715,17 @@ parse_args() {
           --*) shift; CFGPATH=$1
         esac
 
-        [[ -z $CFGPATH ]] && die 'missing PATH argument'
+        [[ -z $CFGPATH ]] && die 'missing path argument'
         check_cfgpath "$CFGPATH"
         ;;
-      --) break ;;
-      *) die "invalid '$1' option"
+      --) shift; break ;;
+      -+([[:alpha:]]))
+        shortopt=${1//+(h|i|n|q|R|v|V)}
+        shortopt=${shortopt:1:1}
+
+        die "invalid '$shortopt' option" "$errhelp for valid options."
+        ;;
+      *) die "invalid '$1' option" "$errhelp for valid options."
     esac
   done
 }
