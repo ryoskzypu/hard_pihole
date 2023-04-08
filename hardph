@@ -34,6 +34,7 @@
 #   - Add unit testing
 #   - Add the source files to a dir tree structure for organization
 #   - Rewrite the README
+#   - Add INSTALL file
 #   - Add changelog, new features, and PGP sig on Github releases
 #   - Add automated unit tests with Github workflows
 
@@ -46,7 +47,7 @@ version='2.0'
 show_help() {
 cat << END
 Usage: $prog [OPTION]...
-  or:  $prog [OPTION]... -r MODE IP[,IP]...
+  or:  $prog [OPTION]... -r MODE IP[,IP] ...
 Hardening command-line tool for Pi-hole.
 Apply allowlist desktop firewall rules from its config file.
 
@@ -676,16 +677,19 @@ parse_opts() {
     : \$@: "$@"
     : \$1: "$1"
     case $1 in
-      -d|--delete) delete=1; shift; parse_args "$1" "$2" ; shift ;;
-      -h|--help) show_help ;;
-      -i|--info) info=1 ;;
-      -n|--dry-run) dry=1 ;;
-      -q|--quiet) quiet=1 ;;
-      -r|--restrict) restrict=1; shift; parse_args "$1" "$2"; shift ;;
-      -R|--reset) reset=1 ;;
-      -v|--version) show_version ;;
-      -V|--verbose) verbose=1 ;;
-      --config-path) shift; CFGPATH=$1; [[ -z $CFGPATH ]] && die 'missing path argument' || check_cfgpath "$CFGPATH" ;;
+      -d|--d?(e?(l?(e?(t?(e)))))) delete=1; shift; parse_args "$1" "$2" ; shift ;;
+      -h|--h?(e?(l?(p)))) show_help ;;
+      -i|--i?(n?(f?(o)))) info=1 ;;
+      -n|--d?(r?(y?(-?(r?(u?(n))))))) dry=1 ;;
+      -q|--q?(u?(i?(e?(t))))) quiet=1 ;;
+      --r?(e?(s))) die "ambiguous '$1' option ('--restrict', '--reset')" ;;
+      -r|--res?(t?(r?(i?(c?(t)))))) restrict=1; shift; parse_args "$1" "$2"; shift ;;
+      -R|--res?(e?(t))) reset=1 ;;
+      --v?(e?(r))) die "ambiguous '$1' option ('--version', '--verbose')" ;;
+      -v|--ver?(s?(i?(o?(n))))) show_version ;;
+      -V|--ver?(b?(o?(s?(e))))) verbose=1 ;;
+      --c?(o?(n?(f?(i?(g?(-?(p?(a?(t?(h)))))))))))
+        shift; CFGPATH=$1; [[ -z $CFGPATH ]] && die 'missing path argument' || check_cfgpath "$CFGPATH" ;;
       --) break ;;
       *) die "invalid '$1' option" "$errhelp for valid options."
     esac

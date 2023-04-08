@@ -12,10 +12,10 @@ cfg_filename := $(prog).cfg
 all:
 	@printf '%s\n' \
 		'Usage:' \
-		'  make lint         lint the scripts' \
-		'  make install-cfg  install the config file' \
-		'  make install      install the package' \
-		'  make uninstall    uninstall the package' \
+		'  make lint        lint the scripts' \
+		'  make install-cfg install the config file' \
+		'  make install     install the package' \
+		'  make uninstall   uninstall the package' \
 		'' \
 		'Examples:' \
 		'  $$ sudo make PREFIX=/usr/local install' \
