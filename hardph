@@ -1,26 +1,24 @@
 #!/bin/bash
 # shellcheck disable=2015
 #
-# hardph
-#
-# Hardening command-line tool for Pi-hole.
+# hardph — hardening command-line tool for Pi-hole
 #
 # Usage:
-#   This script applies allowlist desktop firewall rules from its config file. The
+#   The script applies allowlist desktop firewall rules from its config file. The
 #   default config filepath is "$HOME", but can be specified with '--config-path='
 #   option.
-#   It supports Firewalld and UFW, can apply rules directly with '--restrict' option,
-#   can reset the firewall and apply rules recommended by Pi-hole, and display
-#   the system's general networking information.
-#   The script assumes a GNU/Linux system with default firewall settings, hence it
-#   is recommended to do a '--reset' before applying rules.
+#   It supports firewalld and UFW, can apply rules directly with '--restrict' option,
+#   can reset the firewall and apply rules recommended by Pi-hole, and display the
+#   system's general networking information.
+#   It assumes a GNU/Linux system with default firewall settings, hence it is recommended
+#   to do a '--reset' before applying rules.
 # Rationale:
 #   Many Pi-hole users run with their router's DNS port forwarded by misconfiguration,
 #   thus opened on the internet. Additionally, configuring firewall rules manually can
 #   be cumbersome.
 # Caveat:
-#   The logic and rules behind this script is simple, so advanced users may not find
-#   this much useful, depending on their networking setup.
+#   The logic and rules behind the script is simple, so advanced users may not find
+#   it much useful, depending on their networking setup.
 # Sources:
 #   https://docs.pi-hole.net/main/prerequisites/#firewalls
 #   https://reddit.com/r/pihole/comments/x7wns0/pihole_hardening_tips_4fun
@@ -29,13 +27,15 @@
 #   - Rewrite the script in Unix/GNU style
 #   - Replace noisy prompts and interactivity with options
 #   - Add config file
-#   - Add bash completion
-#   - Add man page
 #   - Add makefile
-#   - Add new features and PGP sig on github releases
+#   - Add man page
+#   - Remove the usage, rationale, etc comments above and add them to the man page
+#   - Add bash completion
 #   - Add unit testing
-#   - Add automated unit tests with github workflows
-#   - Rewrite README
+#   - Add the source files to a dir tree structure for organization
+#   - Rewrite the README
+#   - Add changelog, new features, and PGP sig on Github releases
+#   - Add automated unit tests with Github workflows
 
 shopt -s extglob
 
@@ -46,7 +46,7 @@ version='2.0'
 show_help() {
 cat << END
 Usage: $prog [OPTION]...
-  or:  $prog -r MODE IP...
+  or:  $prog [OPTION]... -r MODE IP[,IP]...
 Hardening command-line tool for Pi-hole.
 Apply allowlist desktop firewall rules from its config file.
 
@@ -54,16 +54,16 @@ With no --config-path= OPTION, set PATH to the user's home directory.
 With the --restrict= OPTION, do not parse the config file.
 
 Options:
-      --config-path=PATH  set PATH of config file
-  -d, --delete=MODE IP    delete IP address of MODE
-  -h, --help              display this help and exit
-  -i, --info              output all MODEs status information and exit
-  -n, --dry-run           print firewall commands without execution
-  -q, --quiet             show no output
-  -r, --restrict=MODE IP  restrict MODE by IP address
-  -R, --reset             reset firewall and apply the recommended Pi-hole rules
-  -v, --version           output version information and exit
-  -V, --verbose           more output verbosity
+  -d, --delete=MODE IP   delete IP address of MODE
+  -h, --help             display this help and exit
+  -i, --info             output all MODEs status information and exit
+  -n, --dry-run          print firewall commands without execution
+  -q, --quiet            show no output
+  -r, --restrict=MODE IP restrict MODE by IP address
+  -R, --reset            reset firewall and apply the recommended Pi-hole rules
+  -v, --version          output version information and exit
+  -V, --verbose          more output verbosity
+      --config-path=PATH set PATH of config file
 
 Firewalls:
   firewalld, UFW
@@ -72,10 +72,10 @@ MODEs:
   pihole, ssh, web
 
 IPs:
-  Valid allowed IPs must be IPv4 and separated by spaces.
+  Valid allowed IPs must be IPv4 and separated by commas.
 
 Example:
-  $ $prog -r pihole 192.168.0.0/24 -r web 192.168.0.3 192.168.0.7
+  $ $prog -r pihole 192.168.0.0/24 -r web 192.168.0.3,192.168.0.7
     allow only the 192.168.0.1–254 range of IPs to access Pi-hole, also
     only the 192.168.0.3 and 192.168.0.7 IPs to access web interface.
 END
@@ -122,6 +122,7 @@ parse_cfgfile() {
   fi
 
   while read -r line; do
+    : \$line: "$line"
     case $line in
       @(pihole|ssh|web)_ips=\()
         mode=${line%_*}
@@ -130,6 +131,7 @@ parse_cfgfile() {
         unset mode
         ;;
       !(\#*|''))
+        : \$mode: "$mode"
         case $mode in
           pihole|ssh|web)
             declare -n mode_ips=${mode}_ips
@@ -138,6 +140,10 @@ parse_cfgfile() {
     esac
     continue
   done < "$expand_tilde/$cfgname"
+
+  : 'pihole_ips=('"${pihole_ips[*]}"')'
+  : 'ssh_ips=('"${ssh_ips[*]}"')'
+  : 'web_ips=('"${web_ips[*]}"')'
 }
 
 fwfmt() {
@@ -161,18 +167,7 @@ reload_firewall() {
 
 # shellcheck disable=2086
 apply_fwd_rules() {
-  local service err ip
-
-  service=$1
-  err='failed to apply firewalld rule'
-
-  printf '%s\n' 'Applying firewalld rules...'
-
-  if ((!delete)) && sudo firewall-cmd --zone=public --query-service="$service" > /dev/null; then
-    printf '%s\n' "Removing $service service..."
-
-    $print sudo firewall-cmd --permanent --remove-service="$service" >&$((1 + fd)) || die "$err"
-  fi
+  local ip
 
   for ip in "${mode_ips[@]}"; do
     fwfmt "$service" 'service'
@@ -180,34 +175,33 @@ apply_fwd_rules() {
     $print sudo firewall-cmd --permanent --${cmd:-add}-rich-rule="rule family=ipv4 \
       source address=$ip service name=$service accept" >&$((1 + fd)) || die "$err"
   done
+}
+
+del_fwd_services() {
+  if ((!delete)) && sudo firewall-cmd --zone=public --query-service="$service" > /dev/null; then
+    printf '%s\n' "Removing $service service..."
+
+    $print sudo firewall-cmd --permanent --remove-service="$service" >&$((1 + fd)) || die "$err"
+  fi
+}
+
+parse_firewalld() {
+  local service err
+
+  service=$1
+  err='failed to apply firewalld rule'
+
+  printf '%s\n' 'Applying firewalld rules...'
+
+  del_fwd_services
+  apply_fwd_rules
 
   printf '%s\n' 'OK'
 }
 
 # shellcheck disable=2086
 apply_ufw_rules() {
-  local portnr service_status err port ip
-
-  portnr=$1
-  service_status=$(sudo ufw status | awk -v var="^${portnr}/" '$1 ~ var && $3 == "Anywhere"')
-  err='failed to apply ufw rule'
-
-  case $portnr in
-    22) port='SSH' ;;
-    53) port='DNS' ;;
-    80) port='HTTP'
-  esac
-
-  printf '%s\n' 'Applying ufw rules...'
-
-  if ((!delete)) && [[ -n ${service_status[*]} ]]; then
-    printf '%s\n' "Removing $port port rules..."
-
-    case $portnr in
-      53) { $print sudo ufw delete allow 53/tcp && $print sudo ufw delete allow 53/udp; } >&$((1 + fd)) || die "$err" ;;
-      22|80) $print sudo ufw delete allow "$portnr"/tcp >&$((1 + fd)) || die "$err"
-    esac
-  fi
+  local ip
 
   for ip in "${mode_ips[@]}"; do
     fwfmt "$port" 'port'
@@ -223,6 +217,36 @@ apply_ufw_rules() {
         $print sudo ufw $cmd allow proto tcp from "$ip" to any port "$portnr" >&$((1 + fd)) || die "$err"
     esac
   done
+}
+
+del_ufw_ports() {
+  if ((!delete)) && [[ -n ${service_status[*]} ]]; then
+    printf '%s\n' "Removing $port port rules..."
+
+    case $portnr in
+      53) { $print sudo ufw delete allow 53/tcp && $print sudo ufw delete allow 53/udp; } >&$((1 + fd)) || die "$err" ;;
+      22|80) $print sudo ufw delete allow "$portnr"/tcp >&$((1 + fd)) || die "$err"
+    esac
+  fi
+}
+
+parse_ufw() {
+  local portnr service_status err port
+
+  portnr=$1
+  service_status=$(sudo ufw status | awk -v var="^${portnr}/" '$1 ~ var && $3 == "Anywhere"')
+  err='failed to apply ufw rule'
+
+  case $portnr in
+    22) port='SSH' ;;
+    53) port='DNS' ;;
+    80) port='HTTP'
+  esac
+
+  printf '%s\n' 'Applying ufw rules...'
+
+  del_ufw_ports
+  apply_ufw_rules
 
   printf '%s\n' 'OK'
 }
@@ -236,20 +260,20 @@ parse_rules() {
   case $mode in
     pihole)
       case $firewall in
-        firewalld) apply_fwd_rules dns ;;
-        ufw) apply_ufw_rules 53
+        firewalld) parse_firewalld dns ;;
+        ufw) parse_ufw 53
       esac
       ;;
     ssh)
       case $firewall in
-        firewalld) apply_fwd_rules ssh ;;
-        ufw) apply_ufw_rules 22
+        firewalld) parse_firewalld ssh ;;
+        ufw) parse_ufw 22
       esac
       ;;
     web)
       case $firewall in
-        firewalld) apply_fwd_rules http ;;
-        ufw) apply_ufw_rules 80
+        firewalld) parse_firewalld http ;;
+        ufw) parse_ufw 80
       esac
   esac
 }
@@ -267,7 +291,6 @@ validate_ip() {
   local invalid_ips range cidr ip_regex ip
 
   invalid_ips=()
-
   range='[1-9]?[0-9]|1[0-9][0-9]|25[0-5]|2[0-4][0-9]'
   cidr='[0-9]|1[0-9]|2[0-9]|3[0-2]'
   ip_regex="^(($range)\.){3}($range)(\/?(($cidr)?))$"
@@ -370,7 +393,15 @@ server_status() {
     web) port=80 target='Web'
   esac
 
-  service=$(sudo ss -ntlp4 | awk -v var=":${port}$" '$4 ~ var {split($6, str, /"/); print str[2]}')
+  service=$(
+    sudo ss \
+      --numeric \
+      --tcp \
+      --listening \
+      --processes \
+      --ipv4 \
+      | awk -v var=":${port}$" '$4 ~ var {split($6, str, /"/); print str[2]}'
+    )
 
   printf '%s\n' "$target server"
 
@@ -459,7 +490,7 @@ get_net_info() {
   read -r _ _ gateway _ device _ lanip _ < <(ip -o -4 route get 1.0.0.0)
 
   mac=$(< "/sys/class/net/$device/address")
-  route=$(ip -o -4 route show dev "$device" proto kernel scope link | awk '{print $1}')
+  route=$(ip -oneline -4 route show dev "$device" proto kernel scope link | awk '{print $1}')
   wanip=$(dig +short TXT whoami.ds.akahelp.net | awk -F'"' '{print $4}')
 }
 
@@ -531,7 +562,6 @@ check_fw_activity() {
 
 check_firewalls() {
   local installed i
-
   installed=()
 
   printf '%s\n' 'Checking firewalls...'
@@ -553,17 +583,17 @@ check_firewalls() {
 optionals_fmt() {
   local str item tmp
 
-  case ${#opts[@]} in
+  case ${#optionals[@]} in
     1)
-      errfmt "${opts[*]} is"
+      errfmt "${optionals[*]} is"
       ;;
     2)
-      str=${opts[*]/%/ and}
+      str=${optionals[*]/%/ and}
       errfmt "${str% and} are"
       ;;
     *)
-      item=${opts[-2]}
-      tmp=${opts[*]/%/,}
+      item=${optionals[-2]}
+      tmp=${optionals[*]/%/,}
       str=${tmp/${item},/${item} and}
 
       errfmt "${str%,} are"
@@ -579,7 +609,7 @@ check_depends() {
     if ! is_installed "$dep"; then
       case $dep in
         sudo|pihole) die "$dep is not installed" ;;
-        *) opts+=("$dep")
+        *) optionals+=("$dep")
       esac
     fi
   done
@@ -588,7 +618,7 @@ check_depends() {
 }
 
 check_install() {
-  local depends firewalls opts
+  local depends firewalls optionals
 
   depends=(
     'sudo'
@@ -606,60 +636,36 @@ check_install() {
     'firewall-cmd'
     'ufw'
   )
-  opts=()
+  optionals=()
 
   check_depends
-  [[ -n ${opts[*]} ]] && optionals_fmt
+  [[ -n ${optionals[*]} ]] && optionals_fmt
   check_firewalls
 }
 
-parse_modes() {
-  local err arg
-  : \$@: "$@"
-  : \$mode: "$mode"
+parse_args() {
+  local mode err ips
+
+  mode=$1
+  err="missing $mode IPs"
   declare -n mode_ips=${mode}_ips
-  err="missing $mode IPs"; shift
+
+  : \$@: "$@"
+  case $mode in
+    '') die 'missing mode argument' ;;
+    !(pihole|ssh|web)) die "invalid '$mode' mode" "$errhelp for valid modes."
+  esac
+  shift
 
   [[ -z $1 ]] && die "$err"
 
-  for arg; do
-    : \$arg: "$arg"
-    if [[ $arg = -* ]]; then
-      [[ -z ${mode_ips[*]} ]] && die "$err" || break
-    else
-      mode_ips+=("$arg"); shift
-    fi
-  done
-
-  : \$@: "$@"
-  readarray -t main_args < <(printf '%s\n' "$@")
+  readarray -td',' ips < <(printf '%s' "$1")
+  mode_ips+=("${ips[@]}")
+  : "${mode}_ips"'=('"${mode_ips[*]}"')'
 }
 
 parse_opts() {
-  local opts i
-
-  opts=$1
-
-  for ((i=0; i < ${#opts}; i++)); do
-    : "${opts:i:1}"
-    case ${opts:i:1} in
-      h) help=1 ;;
-      i) info=1 ;;
-      n) dry=1 ;;
-      q) quiet=1 ;;
-      R) reset=1 ;;
-      v) ver=1 ;;
-      V) verb=1
-    esac
-  done
-
-  ((help)) && show_help
-  ((ver)) && show_version
-}
-
-# shellcheck disable=2034
-parse_args() {
-  local opts mode short shortopt expand_tilde
+  local expand_tilde
 
   pihole_ips=()
   ssh_ips=()
@@ -668,79 +674,93 @@ parse_args() {
 
   while (($#)); do
     : \$@: "$@"
+    : \$1: "$1"
     case $1 in
-      -+(h|i|n|q|R|v|V)) parse_opts "${@#-}"; shift ;;
-      --help) show_help ;;
-      --version) show_version ;;
-      --info) info=1; shift ;;
-      --dry-run) dry=1; shift ;;
-      --quiet) quiet=1; shift ;;
-      --reset) reset=1; shift ;;
-      --verbose) verb=1; shift ;;
-      --@(delete|restrict)?(=*)|-+(h|i|n|q|R|v|V)@(d|r)*([[:print:]])|-@(d|r)*([[:print:]]))
-        : \$1: "$1"
-        case $1 in
-          *d*) delete=1 ;;
-          *r*) restrict=1
-        esac
-
-        ((delete && restrict)) && die 'mixed --delete= and --restrict= options'
-
-        case $1 in
-          --*=*) mode=${1#*=} ;;
-          --*) shift; mode=$1 ;;
-          -+(h|i|n|q|R|v|V)d?*|-d?*) short=1 opts=${1%d*} mode=${1#*d} ;;
-          -+(h|i|n|q|R|v|V)r?*|-r?*) short=1 opts=${1%r*} mode=${1#*r} ;;
-          -*) short=1 opts=${1%?}; shift; mode=$1
-        esac
-        #echo "$opts"
-        #echo "$mode"
-        #echo "$@"
-        #exit
-        opts=${opts#-}
-        if ((short)) && [[ -n $opts ]]; then
-          parse_opts "$opts"
-        fi
-
-        : \$mode: "$mode"
-        case $mode in
-          pihole|ssh|web) parse_modes "$@"; [[ -z ${main_args[*]} ]] && set -- || set -- "${main_args[@]}" ;;
-          '') die 'missing mode argument' ;;
-          *) die "invalid '$mode' mode" "$errhelp for valid modes."
-        esac
-        ;;
-      --config-path?(=*))
-        case $1 in
-          --*=*) CFGPATH=${1#*=}; shift ;;
-          --*) shift; CFGPATH=$1
-        esac
-
-        [[ -z $CFGPATH ]] && die 'missing path argument'
-        check_cfgpath "$CFGPATH"
-        ;;
-      --) shift; break ;;
-      -+([[:alpha:]]))
-        shortopt=${1//+(h|i|n|q|R|v|V)}
-        shortopt=${shortopt:1:1}
-
-        die "invalid '$shortopt' option" "$errhelp for valid options."
-        ;;
+      -d|--delete) delete=1; shift; parse_args "$1" "$2" ; shift ;;
+      -h|--help) show_help ;;
+      -i|--info) info=1 ;;
+      -n|--dry-run) dry=1 ;;
+      -q|--quiet) quiet=1 ;;
+      -r|--restrict) restrict=1; shift; parse_args "$1" "$2"; shift ;;
+      -R|--reset) reset=1 ;;
+      -v|--version) show_version ;;
+      -V|--verbose) verbose=1 ;;
+      --config-path) shift; CFGPATH=$1; [[ -z $CFGPATH ]] && die 'missing path argument' || check_cfgpath "$CFGPATH" ;;
+      --) break ;;
       *) die "invalid '$1' option" "$errhelp for valid options."
+    esac
+    shift
+  done
+}
+
+preprocess_opts() {
+  local touch touch_opts arg i argc x
+
+  argv=()
+  end_opts=
+  touch=
+  touch_opts='d|r'
+
+  while (($#)); do
+    arg=$1; shift
+
+    : \$1: "${end_opts}$arg"
+    case ${end_opts}$arg in
+      --) ((!touch)) && end_opts=1; touch=; argv+=("$arg") ;;
+      --*=*) x=${arg#*=} argv+=("${arg%%=*}" ${x:+"$x"}) ;;
+      --*|-) argv+=("$arg") ;;
+      -*)
+        for ((i=2; i <= ${#arg}; i++)); do
+          argc=${arg:i-1:1}
+          x=${arg#*"$argc"}
+          [[ $argc != -* ]] && argc=-$argc
+
+          : \$argc: "$argc"
+          case $argc in
+            -@($touch_opts))
+              [[ -z $x && -n $1 ]] && { argv+=("$argc" "$1"); shift; } || argv+=("$argc" ${x:+"$x"})
+              [[ -z $x && $1 = '--' ]] && touch=1
+              break
+              ;;
+            *)
+              argv+=("$argc")
+          esac
+        done
+        ;;
+      *) argv+=("$arg")
     esac
   done
 }
 
-parse_args "$@"
-#declare -p pihole_ips
-#declare -p ssh_ips
-#declare -p web_ips
+preprocess_opts "$@"
+: 'set preprocessed options & args'
+set -- "${argv[@]}"
+
+parse_opts "$@"
+set --
+
+: 'pos. params='"$*"
+: 'pihole_ips=('"${pihole_ips[*]}"')'
+: 'ssh_ips=('"${ssh_ips[*]}"')'
+: 'web_ips=('"${web_ips[*]}"')'
+: 'CFGPATH='"$CFGPATH"
+: 'delete='"$delete"
+: 'info='"$info"
+: 'dry='"$dry"
+: 'quiet='"$quiet"
+: 'restrict='"$restrict"
+: 'reset='"$reset"
+: 'verbose='"$verbose"
+: 'end_opts='"$end_opts"
+
 exec 3>&1
 ((quiet)) && { exec 3>&-; exec > /dev/null 2>&1; }
-((!verb)) && exec > /dev/null
+((!verbose)) && exec > /dev/null
 
 check_install
 ((info)) && show_info
 ((dry)) && print='echo' fd=2
 ((reset)) && reset_rules
+((delete && restrict)) && die "mixed '--delete=' and '--restrict=' options"
 ((delete || restrict)) && { parse_ips; exit $?; }
 parse_cfgfile && parse_ips
