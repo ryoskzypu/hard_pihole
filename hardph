@@ -3,20 +3,13 @@
 #
 # hardph — hardening command-line tool for Pi-hole
 #
-# Usage:
-#   The script applies allowlist desktop firewall rules from its config file. The
-#   default config filepath is "$HOME", but can be specified with '--config-path='
-#   option.
-#   It supports firewalld and UFW, can apply rules directly with '--restrict' option,
-#   can reset the firewall and apply rules recommended by Pi-hole, and display the
-#   system's general networking information.
-#   It assumes a GNU/Linux system with default firewall settings, hence it is recommended
-#   to do a '--reset' before applying rules.
+# Apply allowlist desktop firewall rules from its config file.
+#
 # Rationale:
 #   Many Pi-hole users run with their router's DNS port forwarded by misconfiguration,
 #   thus opened on the internet. Additionally, configuring firewall rules manually can
 #   be cumbersome.
-# Caveat:
+# Caveat/Limitations:
 #   The logic and rules behind the script is simple, so advanced users may not find
 #   it much useful, depending on their networking setup.
 # Sources:
@@ -29,7 +22,7 @@
 #   - Add config file
 #   - Add makefile
 #   - Add man page
-#   - Remove the usage, rationale, etc comments above and add them to the man page
+#   - Remove the rationale and caveat comments above and add them plus sources to the README
 #   - Add bash completion
 #   - Add unit testing
 #   - Add the source files to a dir tree structure for organization
@@ -51,19 +44,19 @@ Usage: $prog [OPTION]...
 Hardening command-line tool for Pi-hole.
 Apply allowlist desktop firewall rules from its config file.
 
-With no --config-path= OPTION, set PATH to the user's home directory.
-With the --restrict= OPTION, do not parse the config file.
+With no --config-path= option, set PATH to the user's home directory.
+With the --delete= or --restrict= option, do not parse the config file.
 
 Options:
   -d, --delete=MODE IP   delete IP address of MODE
-  -h, --help             display this help and exit
-  -i, --info             output all MODEs status information and exit
+  -h, --help             show this help and exit
+  -i, --info             output all MODEs status info and exit
   -n, --dry-run          print firewall commands without execution
-  -q, --quiet            show no output
+  -q, --quiet            suppress output
   -r, --restrict=MODE IP restrict MODE by IP address
-  -R, --reset            reset firewall and apply the recommended Pi-hole rules
-  -v, --version          output version information and exit
-  -V, --verbose          more output verbosity
+  -R, --reset            reset the firewall and apply recommended Pi-hole's rules
+  -v, --verbose          more output info
+  -V, --version          show version info and exit
       --config-path=PATH set PATH of config file
 
 Firewalls:
@@ -686,8 +679,8 @@ parse_opts() {
       -r|--res?(t?(r?(i?(c?(t)))))) restrict=1; shift; parse_args "$1" "$2"; shift ;;
       -R|--res?(e?(t))) reset=1 ;;
       --v?(e?(r))) die "ambiguous '$1' option ('--version', '--verbose')" ;;
-      -v|--ver?(s?(i?(o?(n))))) show_version ;;
-      -V|--ver?(b?(o?(s?(e))))) verbose=1 ;;
+      -v|--ver?(b?(o?(s?(e))))) verbose=1 ;;
+      -V|--ver?(s?(i?(o?(n))))) show_version ;;
       --c?(o?(n?(f?(i?(g?(-?(p?(a?(t?(h)))))))))))
         shift; CFGPATH=$1; [[ -z $CFGPATH ]] && die 'missing path argument' || check_cfgpath "$CFGPATH" ;;
       --) break ;;

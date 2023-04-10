@@ -1,99 +1,117 @@
-% HARDPH(8) hardph 2.0 | System Administration Commands Manual
+% HARDPH(8) hardph 2.0 | System Administration Commands
 %
-% Apr 2023
+% 2023-04-09
 
 # NAME
-hardph - hardening command-line tool for Pi-hole 
+hardph - hardening command-line tool for Pi-hole
 
 # SYNOPSIS
 **hardph** *[OPTION]*... \
-**hardph** *[OPTION]*... *-r* *MODE* *IP[,IP]* ...
+**hardph** [*OPTION*]... -d *MODE* *IP*[*,IP*] ... \
+**hardph** [*OPTION*]... -r *MODE* *IP*[*,IP*] ...
 
 # DESCRIPTION
-Apply allowlist desktop firewall rules from its config file.
+**hardph** applies allowlist desktop firewall rules based on *MODE*s from its
+config file. It supports firewalld or UFW and assumes a GNU/Linux system with
+default firewall settings.
+
+The *MODE*s are: **pihole**, **ssh**, and **web**. The allowed *IP*s must be IPv4
+and comma delimited (if option defined) in order to be validated.
+
+In addition, **hardph** includes commands to delete/restrict the allowed *IP*s,
+reset the firewall and apply the recommended Pi-hole rules, also output the system's
+network information.
+
+After parsing its *IP*s from the config file/command-line, **hardph** checks if a
+port/service of *MODE* is active, then removes it before applying the firewall
+allow rules — hence it is recommended in advance to save the current rules, or use
+the **--dry-run** option to avoid losing the previous rules.
 
 # OPTIONS
-With no --config-path= *OPTION*, set PATH to the user's home directory.
-
-With the --restrict= *OPTION*, do not parse the config file.
-
-**-d**, **--delete**=*MODE* *IP*
-: delete IP address of *MODE*
-
+## General Information
 **-h**, **--help**
-: display this help and exit
+: Output the help usage message and exit.
 
 **-i**, **--info**
-: output all *MODE*s status information and exit
+: Output the system's network information, all *MODE*s status information, and exit.
 
-**-n**, **--dry-run**
-: print firewall commands without execution
+**-V**, **--version**
+: Output the **hardph** version number and exit.
 
+## Output Control
 **-q**, **--quiet**
-: show no output
+: Do not write anything to the standard output.
 
-**-r**, **--restrict**=*MODE* *IP*
-: restrict *MODE* by IP address
+**-v**, **--verbose**
+: Show more output information.
+
+## Firewall Control
+**-n**, **--dry-run**
+: Print and do not execute the firewall commands.
+
+**-d** *MODE* *IP*, **--delete**=*MODE* *IP*
+: Delete *IP* address of *MODE* and do not parse the config file.
+
+**-r** *MODE* *IP*, **--restrict**=*MODE* *IP*
+: Restrict *MODE* by *IP* address and do not parse the config file.
 
 **-R**, **--reset**
-: reset firewall and apply the recommended Pi-hole rules
+: Reset the firewall and apply the recommended Pi-hole rules.
 
-**-v**, **--version**
-: output version information and exit
-
-**-V**, **--verbose**
-: more output verbosity
-
+## Configuration File
 **--config-path**=*PATH*
-: set PATH of config file
+: Set the pathname of config file, otherwise *PATH* is set to the user's home directory.
 
-# FIREWALLS
-firewalld, UFW
+# EXAMPLES
+**$ hardph --quiet**
+: Parse/apply the *IP*s of **~/.hardph.cfg** file and suppress the stdout, including
+errors.
 
-# MODES
-pihole, ssh, web
+**$ hardph -r pihole 192.168.0.0/24 -r web 192.168.0.3,192.168.0.7**
+: Allow only the 192.168.0.1–254 range of *IP*s to access Pi-hole, also only the
+192.168.0.3 and 192.168.0.7 *IP*s to access the web interface.
 
-# IPS
-Valid allowed IPs must be IPv4 and comma delimited.
+**$ hardph -d pihole 192.168.0.0/24 -d web 192.168.0.3,192.168.0.7**
+: Undo the command above.
 
-# EXIT STATUS
-**0**
-: success
+**$ hardph --dry-run --reset**
+: Print and do not execute the firewall commands used in the **--reset** option,
+for testing.
 
-**1**
-: error
+**$ hardph --verbose --restrict=ssh 10.0.0.5,10.0.0.6,10.0.0.7**
+: Execute **hardph** in verbose mode, allow only the 10.0.0.5, 10.0.0.6, and 10.0.0.7 *IP*s to access the SSH server.
 
-# ENVIRONMENT VARIABLES
-*CFGPATH*
-: If $CFGPATH is set, its value overrides the default **hardph** config pathname.
+**$ export CFGPATH=/tmp; hardph**
+: Export $CFGPATH environment variable to the /tmp directory and run **hardph**.
+Equivalent to **hardph --config-path=/tmp**.
 
 # FILES
 **~/.hardph.cfg**
-: The default **hardph** configuration file directory.
+: The default **hardph.cfg** config file directory. See **hardph.cfg**(5) for usage
+information.
 
-# EXAMPLES
-**$ hardph -r pihole 192.168.0.0/24 -r web 192.168.0.3,192.168.0.7**
-: Allow only the 192.168.0.1–254 range of IPs to access Pi-hole, also only the 192.168.0.3 and 192.168.0.7 IPs to access web interface.
+# ENVIRONMENT
+*CFGPATH*
+: If $CFGPATH is set, its value overrides the pathname of **hardph.cfg** file.
+
+# EXIT STATUS
+**0**
+: Success.
+
+**1**
+: Error.
+
+# BUGS
+Report bugs to <https://github.com/ryoskzypu/hard_pihole/issues>.
+
+# SEE ALSO
+**firewall-cmd**(1), **hardph.cfg**(5), **pihole**(8), **ufw**(8)
+
+<https://docs.pi-hole.net/main/prerequisites/#firewalls>, <https://reddit.com/r/pihole/comments/x7wns0/pihole_hardening_tips_4fun>
 
 # AUTHOR
 ryoskzypu <ryoskzypu@proton.me>
 
-# REPORTING BUGS
-If you find a bug, please create an issue at https://github.com/ryoskzypu/hard_pihole/issues.
-
 # COPYRIGHT
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>.
-
-# SEE ALSO
-**firewall-cmd(1)**, **ufw(8)**, **pihole(8)**
+Copyright © 2023 ryoskzypu. License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>. \
+This is free software: you are free to change and redistribute it.  There is NO WARRANTY, to the extent permitted by law.
