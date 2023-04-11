@@ -1,19 +1,32 @@
 % HARDPH(8) hardph 2.0 | System Administration Commands
 %
-% 2023-04-09
+% 2023-04-10
+
+---
+# For man page conventions, see grep(1), man(1), host.conf(5), man-pages(7).
+#
+# Also:
+#   https://www.gnu.org/prep/standards/standards.html#GNU-Manuals
+#   https://www.gnu.org/software/help2man/
+#   https://en.wikipedia.org/wiki/Man_page
+#   https://ubuntu-mate.community/t/how-to-create-your-own-man-pages/7931/2
+#
+# For pandoc guides, see:
+#   https://www.howtogeek.com/682871/how-to-create-a-man-page-on-linux/
+#   https://unix.stackexchange.com/questions/6891/how-can-i-add-man-page-entries-for-my-own-power-tools/375035#375035
+---
 
 # NAME
 hardph - hardening command-line tool for Pi-hole
 
 # SYNOPSIS
 **hardph** *[OPTION]*... \
-**hardph** [*OPTION*]... -d *MODE* *IP*[*,IP*] ... \
-**hardph** [*OPTION*]... -r *MODE* *IP*[*,IP*] ...
+**hardph** [*OPTION*]... -d *MODE* *IP*[,...] ... \
+**hardph** [*OPTION*]... -r *MODE* *IP*[,...] ...
 
 # DESCRIPTION
-**hardph** applies allowlist desktop firewall rules based on *MODE*s from its
-config file. It supports firewalld or UFW and assumes a GNU/Linux system with
-default firewall settings.
+**hardph** applies allowlist desktop firewall rules, based on *MODE*s from its
+config file. It supports firewalld or UFW and assumes a GNU/Linux system.
 
 The *MODE*s are: **pihole**, **ssh**, and **web**. The allowed *IP*s must be IPv4
 and comma delimited (if option defined) in order to be validated.
@@ -25,12 +38,12 @@ network information.
 After parsing its *IP*s from the config file/command-line, **hardph** checks if a
 port/service of *MODE* is active, then removes it before applying the firewall
 allow rules — hence it is recommended in advance to save the current rules, or use
-the **--dry-run** option to avoid losing the previous rules.
+the **--dry-run** option — to avoid losing the previous rules.
 
 # OPTIONS
 ## General Information
 **-h**, **--help**
-: Output the help usage message and exit.
+: Output the help usage and exit.
 
 **-i**, **--info**
 : Output the system's network information, all *MODE*s status information, and exit.
@@ -49,10 +62,10 @@ the **--dry-run** option to avoid losing the previous rules.
 **-n**, **--dry-run**
 : Print and do not execute the firewall commands.
 
-**-d** *MODE* *IP*, **--delete**=*MODE* *IP*
+**-d** *MODE* *IP*[,...], **--delete**=*MODE* *IP*[,...]
 : Delete *IP* address of *MODE* and do not parse the config file.
 
-**-r** *MODE* *IP*, **--restrict**=*MODE* *IP*
+**-r** *MODE* *IP*[,...], **--restrict**=*MODE* *IP*[,...]
 : Restrict *MODE* by *IP* address and do not parse the config file.
 
 **-R**, **--reset**
@@ -62,9 +75,28 @@ the **--dry-run** option to avoid losing the previous rules.
 **--config-path**=*PATH*
 : Set the pathname of config file, otherwise *PATH* is set to the user's home directory.
 
+# FILES
+*~/.hardph.cfg*
+: The default **hardph.cfg** config file directory. See **hardph.cfg**(5) for usage
+information.
+
+# ENVIRONMENT
+**CFGPATH**
+: If **$CFGPATH** is set, its value overrides the pathname of **hardph.cfg** file.
+
+# EXIT STATUS
+**0**
+: Successful program execution.
+
+**1**
+: Usage, syntax or file error.
+
+**2**
+: Firewall command error.
+
 # EXAMPLES
 **$ hardph --quiet**
-: Parse/apply the *IP*s of **~/.hardph.cfg** file and suppress the stdout, including
+: Parse/apply the *IP*s of *~/.hardph.cfg* file and suppress the stdout, including
 errors.
 
 **$ hardph -r pihole 192.168.0.0/24 -r web 192.168.0.3,192.168.0.7**
@@ -75,31 +107,14 @@ errors.
 : Undo the command above.
 
 **$ hardph --dry-run --reset**
-: Print and do not execute the firewall commands used in the **--reset** option,
-for testing.
+: Print and do not execute the **--reset** firewall commands, for testing.
 
 **$ hardph --verbose --restrict=ssh 10.0.0.5,10.0.0.6,10.0.0.7**
-: Execute **hardph** in verbose mode, allow only the 10.0.0.5, 10.0.0.6, and 10.0.0.7 *IP*s to access the SSH server.
+: Execute **hardph** in verbose mode; allow only the 10.0.0.5, 10.0.0.6, and 10.0.0.7 *IP*s to access the SSH server.
 
 **$ export CFGPATH=/tmp; hardph**
-: Export $CFGPATH environment variable to the /tmp directory and run **hardph**.
+: Export **$CFGPATH** environment variable to the */tmp* directory and execute **hardph**.
 Equivalent to **hardph --config-path=/tmp**.
-
-# FILES
-**~/.hardph.cfg**
-: The default **hardph.cfg** config file directory. See **hardph.cfg**(5) for usage
-information.
-
-# ENVIRONMENT
-*CFGPATH*
-: If $CFGPATH is set, its value overrides the pathname of **hardph.cfg** file.
-
-# EXIT STATUS
-**0**
-: Success.
-
-**1**
-: Error.
 
 # BUGS
 Report bugs to <https://github.com/ryoskzypu/hard_pihole/issues>.

@@ -1,12 +1,12 @@
 % HARDPH.CFG(5) hardph 2.0 | File Formats and Conventions
 %
-% 2023-04-09
+% 2023-04-10
 
 # NAME
 hardph.cfg - hardph configuration file
 
 # DESCRIPTION
-The ~/.hardph.cfg file contains the allowlist *IP*s of *MODE*s that are parsed by
+The *~/.hardph.cfg* file contains the allowlist *IP*s of *MODE*s that are parsed by
 **hardph**(8). The *MODE*s are the ones supported by **hardph**(8) and suffixed with
 '_ips=('.
 
@@ -15,24 +15,24 @@ respective *MODE*s, in order to **hardph**(8) parse them correctly. Blank lines 
 lines beginning with '#' are ignored.
 
 # EXAMPLES
-\# Allow only the 192.168.0.1–254 range of *IP*s to access Pi-hole. \
+\# Allow only the 192.168.0.1–254 range of IPs to access Pi-hole. \
 pihole_ips=( \
 \  192.168.0.0/24 \
 )
 
-\# Allow only the 192.168.0.3 *IP* to access SSH server. \
+\# Allow only the 192.168.0.3 IP to access the SSH server. \
 ssh_ips=( \
 \  192.168.0.3 \
 )
 
-\# Allow only the 192.168.0.3 and 192.168.0.7 *IP*s to access web interface. \
+\# Allow only the 192.168.0.3 and 192.168.0.7 IPs to access the web interface. \
 web_ips=( \
 \  192.168.0.3 \
 \  192.168.0.7 \
 )
 
 # FILES
-**~/.hardph.cfg**
+*~/.hardph.cfg*
 : The default **hardph.cfg** config file directory.
 
 # BUGS

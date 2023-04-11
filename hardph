@@ -40,7 +40,7 @@ version='2.0'
 show_help() {
 cat << END
 Usage: $prog [OPTION]...
-  or:  $prog [OPTION]... -r MODE IP[,IP] ...
+  or:  $prog [OPTION]... -r MODE IP[,...] ...
 Hardening command-line tool for Pi-hole.
 Apply allowlist desktop firewall rules from its config file.
 
@@ -152,8 +152,8 @@ reload_firewall() {
   printf '%s\n' "Reloading $firewall..."
 
   case $firewall in
-    firewalld) $print sudo firewall-cmd --reload >&$((1 + fd)) || die "$err" ;;
-    ufw) $print sudo ufw reload >&$((1 + fd)) || die "$err" ;;
+    firewalld) $print sudo firewall-cmd --reload >&$((1 + fd)) || die 2 "$err" ;;
+    ufw) $print sudo ufw reload >&$((1 + fd)) || die 2 "$err" ;;
   esac
 
   printf '%s\n' 'OK'
@@ -167,7 +167,7 @@ apply_fwd_rules() {
     fwfmt "$service" 'service'
 
     $print sudo firewall-cmd --permanent --${cmd:-add}-rich-rule="rule family=ipv4 \
-      source address=$ip service name=$service accept" >&$((1 + fd)) || die "$err"
+      source address=$ip service name=$service accept" >&$((1 + fd)) || die 2 "$err"
   done
 }
 
@@ -175,7 +175,7 @@ del_fwd_services() {
   if ((!delete)) && sudo firewall-cmd --zone=public --query-service="$service" > /dev/null; then
     printf '%s\n' "Removing $service service..."
 
-    $print sudo firewall-cmd --permanent --remove-service="$service" >&$((1 + fd)) || die "$err"
+    $print sudo firewall-cmd --permanent --remove-service="$service" >&$((1 + fd)) || die 2 "$err"
   fi
 }
 
@@ -205,10 +205,10 @@ apply_ufw_rules() {
         {
           $print sudo ufw $cmd allow proto tcp from "$ip" to any port 53
           $print sudo ufw $cmd allow proto udp from "$ip" to any port 53
-        } >&$((1 + fd)) || die "$err"
+        } >&$((1 + fd)) || die 2 "$err"
         ;;
       22|80)
-        $print sudo ufw $cmd allow proto tcp from "$ip" to any port "$portnr" >&$((1 + fd)) || die "$err"
+        $print sudo ufw $cmd allow proto tcp from "$ip" to any port "$portnr" >&$((1 + fd)) || die 2 "$err"
     esac
   done
 }
@@ -218,8 +218,8 @@ del_ufw_ports() {
     printf '%s\n' "Removing $port port rules..."
 
     case $portnr in
-      53) { $print sudo ufw delete allow 53/tcp && $print sudo ufw delete allow 53/udp; } >&$((1 + fd)) || die "$err" ;;
-      22|80) $print sudo ufw delete allow "$portnr"/tcp >&$((1 + fd)) || die "$err"
+      53) { $print sudo ufw delete allow 53/tcp && $print sudo ufw delete allow 53/udp; } >&$((1 + fd)) || die 2 "$err" ;;
+      22|80) $print sudo ufw delete allow "$portnr"/tcp >&$((1 + fd)) || die 2 "$err"
     esac
   fi
 }
@@ -341,7 +341,7 @@ reset_rules() {
           && $print sudo firewall-cmd --permanent --zone=ftl --add-interface=lo \
           && $print sudo firewall-cmd --permanent --zone=ftl --add-port=4711/tcp \
           && $print sudo firewall-cmd --reload
-      } >&$((1 + fd)) || die "$err"
+      } >&$((1 + fd)) || die 2 "$err"
       ;;
     ufw)
       {
@@ -353,7 +353,7 @@ reset_rules() {
           && $print sudo ufw allow 67/tcp \
           && $print sudo ufw allow 67/udp \
           && $print sudo ufw reload
-      } >&$((1 + fd)) || die "$err"
+      } >&$((1 + fd)) || die 2 "$err"
   esac
 
   printf '%s\n' 'OK'
