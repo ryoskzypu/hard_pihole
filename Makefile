@@ -1,3 +1,6 @@
+# Copyright (C) 2023 ryoskzypu
+# License: GPLv3+. See LICENSE for details.
+
 DESTDIR ?=
 PREFIX ?= $(HOME)/.local
 CFGPATH ?= $(HOME)

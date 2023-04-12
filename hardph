@@ -3,15 +3,18 @@
 #
 # hardph — hardening command-line tool for Pi-hole
 #
-# Apply allowlist desktop firewall rules from its config file.
+# Copyright (C) 2022, 2023 ryoskzypu
+# License: GPLv3+. See LICENSE for details.
 #
 # Rationale:
 #   Many Pi-hole users run with their router's DNS port forwarded by misconfiguration,
 #   thus opened on the internet. Additionally, configuring firewall rules manually can
 #   be cumbersome.
+#
 # Caveat/Limitations:
 #   The logic and rules behind the script is simple, so advanced users may not find
 #   it much useful, depending on their networking setup.
+#
 # Sources:
 #   https://docs.pi-hole.net/main/prerequisites/#firewalls
 #   https://reddit.com/r/pihole/comments/x7wns0/pihole_hardening_tips_4fun
@@ -26,8 +29,9 @@
 #   - Add bash completion
 #   - Add unit testing
 #   - Add the source files to a dir tree structure for organization
-#   - Rewrite the README
+#   - Rewrite the README (don't forget to reference the LICENSE)
 #   - Add INSTALL file
+#   - Add a short copyright notice in every source file referencing the LICENSE
 #   - Add changelog, new features, and PGP sig on Github releases
 #   - Add automated unit tests with Github workflows
 
