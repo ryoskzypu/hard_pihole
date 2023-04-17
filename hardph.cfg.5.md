@@ -47,5 +47,5 @@ Report bugs to <https://github.com/ryoskzypu/hard_pihole/issues>.
 ryoskzypu <ryoskzypu@proton.me>
 
 # COPYRIGHT
-Copyright © 2023 ryoskzypu. License GPLv3+: GNU GPL version 3 or later <https://gnu.org/licenses/gpl-3.0.html>. \
+Copyright © 2023 ryoskzypu. License: MIT <https://github.com/ryoskzypu/hard_pihole/raw/main/LICENSE>
 This is free software: you are free to change and redistribute it. There is NO WARRANTY, to the extent permitted by law.

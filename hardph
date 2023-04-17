@@ -3,8 +3,8 @@
 #
 # hardph — hardening command-line tool for Pi-hole
 #
-# Copyright (C) 2022, 2023 ryoskzypu
-# License: GPLv3+. See LICENSE for details.
+# Copyright (c) 2023 ryoskzypu
+# MIT License. See LICENSE for details.
 #
 # Rationale:
 #   Many Pi-hole users run with their router's DNS port forwarded by misconfiguration,
