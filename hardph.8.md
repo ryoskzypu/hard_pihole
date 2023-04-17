@@ -128,5 +128,5 @@ Report bugs to <https://github.com/ryoskzypu/hard_pihole/issues>.
 ryoskzypu <ryoskzypu@proton.me>
 
 # COPYRIGHT
-Copyright © 2023 ryoskzypu. License: MIT <https://github.com/ryoskzypu/hard_pihole/raw/main/LICENSE>
+Copyright © 2023 ryoskzypu. License: MIT <https://github.com/ryoskzypu/hard_pihole/raw/main/LICENSE> \
 This is free software: you are free to change and redistribute it. There is NO WARRANTY, to the extent permitted by law.
