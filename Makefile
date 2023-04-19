@@ -1,5 +1,5 @@
 # Copyright (c) 2023 ryoskzypu
-# MIT License. See LICENSE for details.
+# MIT-0 License. See LICENSE for details.
 
 DESTDIR ?=
 PREFIX ?= $(HOME)/.local

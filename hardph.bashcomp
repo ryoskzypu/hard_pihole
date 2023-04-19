@@ -3,7 +3,7 @@
 # hardph.bashcomp – hardph bash completion
 #
 # Copyright (c) 2023 ryoskzypu
-# MIT License. See LICENSE for details.
+# MIT-0 License. See LICENSE for details.
 #
 # Note:
 #   The script is dependent on the bash-completion library: https://github.com/scop/bash-completion
